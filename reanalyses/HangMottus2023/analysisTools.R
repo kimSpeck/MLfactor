@@ -143,7 +143,7 @@ fitENET.glmnet <- function(xtrain, ytrain, xtest, ytest, var.names, inter = FALS
 # predDomains <- predict(modelDomains, as.matrix(domainsTest), s = "lambda.min")
 # domainsR2.b <- cor(predDomains, dat$ytest)
 
-fitENET.caret <- function(xtrain, ytrain, xtest, ytest, tuneGrid, inter = F){
+fitENET.caret <- function(xtrain, ytrain, xtest, ytest, var.names, tuneGrid, inter = F){
   ###
   # train elastic net regression on training data, predict test data and calculate R2
   ## input:

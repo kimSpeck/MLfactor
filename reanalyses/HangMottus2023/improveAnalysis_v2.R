@@ -42,7 +42,7 @@
 # nFacets = 30
 # nDomains = 5
 
-setwd("../reanalysis/HangMottus2023")
+setwd("reanalyses/HangMottus2023")
 source("analysisTools.R")
 
 logFolder <- "log"
@@ -161,15 +161,22 @@ data <- data[-idxNA,]
 # this procedures does not make any sense;
 #   -> if items are chosen more frequently this happens due to specific variance 
 #       in items that explains variance of the outcome beyond the domains or facets
-#   -> thus, reliability might not be the critical feature to chose among predictors
-#       rather despite lower reliability items are selected more frequently due to more 
+#   -> thus, reliability might not be the critical feature to chose among predictors!
+#       rather, despite lower reliability items are selected more frequently due to more 
 #       variance
 # Frage danach, ob Domänen mehr als ihre Teile/Items sind. Nein. Domänen sagen nichts
 #     über die Einzelitems hinaus aus.
 # -> das ist ja der Witz an einem Faktorenmodell. Der Faktor schlägt sich in Items 
 #     nieder, aber sagt nichts über Items hinaus aus... 
+# to test if more reliable predictors are chosen more frequently by the ENET, we 
+#   need to do a simulation that does not confound reliability with explained variance 
+#   in the outcome (check behaviour of alpha and lambda in this simulation, too)
+#   -> take away: when comparing performance of different models (differing predictor sets)
+#       which substantive conclusions are valid and which behaviour is only due to 
+#       mathematical consequences in the behavior of the ENET?
+#   -> N, simulate R², reliability of the predictors (value, mix: all equal, stepwise differences, ...), correlation of predictors 
 
-fullENET <- function(x1, y, pTrain = 0.75) {
+fullENET <- function(x1, y, pTrain = 0.75, model = "caret") {
   # # test it
   # x1 <- items
   # y <- data$substance 
@@ -216,7 +223,7 @@ fullENET <- function(x1, y, pTrain = 0.75) {
     # estBeta <- as.matrix(fit$beta)
     
     # predict criterion values from the model for the test data
-    predTMP <- predict(model, testData, s = "lambda.min")
+    predTMP <- predict(model.glmnet, testData, s = "lambda.min")
     predCor <- cor(predTMP, dat$ytest)
     
   } else if (model == "caret") {
@@ -229,21 +236,21 @@ fullENET <- function(x1, y, pTrain = 0.75) {
     
     # fit model (including cross-validation)
     fullData <- cbind(trainData, ytrain = dat$ytrain)
-    model <- train(ytrain ~ .,
-                   fullData,
-                   method = "glmnet", #elastic net regularized regression
-                   metric = "RMSE",
-                   #preProc = "scale",
-                   trControl = trainControl(method = "cv", 
-                                            number = 10,
-                                            selectionFunction = "best"), 
-                   tuneGrid = tuneGrid,
-                   verbose = FALSE) #model training using ten-fold cross-validation 
+    model.caret <- train(ytrain ~ .,
+                         fullData,
+                         method = "glmnet", #elastic net regularized regression
+                         metric = "RMSE",
+                         #preProc = "scale",
+                         trControl = trainControl(method = "cv", 
+                                                  number = 10,
+                                                  selectionFunction = "best"), 
+                         tuneGrid = tuneGrid,
+                         verbose = FALSE) #model training using ten-fold cross-validation 
     
-    estBeta <- coef(model$finalModel, model$bestTune$lambda)
+    estBeta <- coef(model.caret$finalModel, model.caret$bestTune$lambda)
     selectedVars <- rownames(estBeta)[which(estBeta != 0)]
     
-    predTMP <- predict(model, testData, s = "lambda.min")
+    predTMP <- predict(model.caret, testData, s = "lambda.min")
     predCor <- cor(predTMP, dat$ytest)
   }
 
@@ -255,6 +262,52 @@ fullENET <- function(x1, y, pTrain = 0.75) {
               nItems = nItems, nFacets = nFacets, nDomains = nDomains))
 
 }
+
+# criterion to predict with ENET
+modelVec <- c("glmnet", "caret") # which model is used, thus, cross validation of alpha or not
+criterionVec <- list(data$p_factor, data$intern, data$psych, data$substance)
+nReps <- 100
+
+nCoresSampling <- 30
+timeStamp <- format(Sys.time(), "%d%m%y_%H%M%S")
+outfileCL <- paste0(logFolder, "/", "fitDataStatus", timeStamp, ".txt")
+cl <- parallel::makeCluster(nCoresSampling, type = "FORK",
+                            outfile = outfileCL)
+
+nProcs = nCoresSampling
+myUser = "kls"
+
+# set seed that works for parallel processing
+set.seed(3940904)
+s <- .Random.seed
+clusterSetRNGStream(cl = cl, iseed = s)
+
+resBeta <- lapply(seq_along(modelVec), function(iModel) {
+
+  TMP <- lapply(seq_along(criterionVec), function(iCrit) {
+    
+    tmp <- parLapply(cl, seq_len(nReps), function(iRep) {
+      #lapply(seq_len(nReps), function(iRep) {
+      fullENET(items, y = criterionVec[[iCrit]], 
+               pTrain = 0.75, model = modelVec[iModel])
+    })
+  })
+  names(TMP) <- c("pFactor", "intern", "psych", "substance")
+  
+  TMP
+})
+
+names(resBeta) <- modelVec
+
+stopCluster(cl)
+
+# save output to run something else but analyse later
+save(resBeta, file = "Dataset/variableSelectionENET.rda")
+
+# Auswertung später machen
+# generell: es werden nicht alle Domänen gewählt; keine Präferenz für Domänen im
+#           Vergleich zu Facetten oder Items
+# wie oben erwähnt: nicht überraschend! 
 
 ################################################################################
 # fit random forest for items, facets and domains (separately)
@@ -359,25 +412,51 @@ myENET <- function(x1, y, pTrain = .75, model = "caret",
   dat <- medianImpute(dat$xtrain, dat$xtest, dat$ytrain, dat$ytest)
 
   # calculate facet and domain values for test and train separately
-  if (facetScores) {
+  if (factorScores) {
+    # to do: 
+    #   - automatically detect Heywood Case (lv variance is negative)!
+    #     build try Catch and tell model what to do if Heywood case occurs
+    #   - Bartlett methods return only 0s as factor scores for higher order factors. 
+    #     why?
+    #   - running code with factor scores throws this error:
+    #     first error: x has missing values; consider using makeX() to impute them
+    #     why?
+    
     # fit CFA with second order factors based on covariance matrix 
     fitTrain <- lavaan::cfa(facetModel, 
                             data = dat$xtrain, 
                             se = "none")
     
+    idxHeywood.train <- which(diag(fitTrain@Model@GLIST$psi) < 0)
+    if (length(idxHeywood.train) > 0) {
+      print(paste0("train: Heywood Case in variances of: ", 
+                   lavNames(fitTrain, type = "lv")[idxHeywood.train]))
+    }
+      
     fitTest <- lavaan::cfa(facetModel, 
                            data = dat$xtest, 
                            se = "none")
     
+    idxHeywood.test <- which(diag(fitTest@Model@GLIST$psi) < 0)
+    if (length(idxHeywood.test) > 0) {
+      print(paste0("train: Heywood Case in variances of: ", 
+                 lavNames(fitTest, type = "lv")[idxHeywood.test]))
+    }
+    
     # predict factor scores based in cfa model of the data
-    fsTrain <- lavPredict(fitTrain, method = "Bartlett") 
-    fsTest <- lavPredict(fitTest, method = "Bartlett") 
+    fsTrain <- lavPredict(fitTrain)
+    fsTest <- lavPredict(fitTest)
+    # # estimation of factor scores based on Bartlett method lead to only zeros in
+    # #     the higher order factors (i.e., domains)
+    # # why though? https://github.com/yrosseel/lavaan/blob/56b8a112d75793a7f8dff61ff4bb6eca412b9bab/R/lav_predict.R#L1059
+    # fsTrain <- lavPredict(fitTrain, method = "Bartlett") 
+    # fsTest <- lavPredict(fitTest, method = "Bartlett") 
     
     # extract only facet or only domain scores
-    facetsTrain <- fsTrain[,colnames(fsTrain) %in% facet.names]
-    facetsTest <- fsTest[,colnames(fsTest) %in% facet.names]
-    domainsTrain <- fsTrain[,colnames(fsTrain) %in% domain.names]
-    domainsTest <- fsTest[,colnames(fsTest) %in% domain.names]
+    facetsTrain <- data.frame(fsTrain[,colnames(fsTrain) %in% facet.names])
+    facetsTest <- data.frame(fsTest[,colnames(fsTest) %in% facet.names])
+    domainsTrain <- data.frame(fsTrain[,colnames(fsTrain) %in% domain.names])
+    domainsTest <- data.frame(fsTest[,colnames(fsTest) %in% domain.names])
     
   } else {
     # unweighted sum scores to calculate facets and domains
@@ -414,9 +493,12 @@ myENET <- function(x1, y, pTrain = .75, model = "caret",
   
   if (model == "glmnet") {
     # fit elastic net regression with standard tuning of lambda and fixed alpha (close to ridge)
-    itemsR2 <- fitENET.glmnet(dat$xtrain, dat$ytrain, dat$xtest, dat$ytest, inter = inter)
-    facetsR2 <- fitENET.glmnet(facetsTrain, dat$ytrain, facetsTest, dat$ytest, inter = inter)
-    domainsR2 <- fitENET.glmnet(domainsTrain, dat$ytrain, domainsTest, dat$ytest, inter = inter)
+    itemsR2 <- fitENET.glmnet(dat$xtrain, dat$ytrain, dat$xtest, dat$ytest, 
+                              var.names = item.names, inter = inter)
+    facetsR2 <- fitENET.glmnet(facetsTrain, dat$ytrain, facetsTest, dat$ytest, 
+                               var.names = facet.names, inter = inter)
+    domainsR2 <- fitENET.glmnet(domainsTrain, dat$ytrain, domainsTest, dat$ytest, 
+                                var.names = domain.names, inter = inter)
   
   } else if (model == "caret") {
     # adjust variable names 
@@ -427,12 +509,12 @@ myENET <- function(x1, y, pTrain = .75, model = "caret",
     colnames(domainsTrain) <- colnames(domainsTest) <- c(domain.names, covNames) 
     
     # fit glmnet with caret
-    itemsR2 <- fitENET.caret(xtrain, ytrain, xtest, ytest, 
-                             tuneGrid = tuneGrid, inter = inter)
-    facetsR2 <- fitENET.caret(facetsTrain, ytrain, facetsTest, ytest, 
-                              tuneGrid = tuneGrid, inter = inter)
-    domainsR2 <- fitENET.caret(domainsTrain, ytrain, domainsTest, ytest, 
-                               tuneGrid = tuneGrid, inter = inter)
+    itemsR2 <- fitENET.caret(dat$xtrain, dat$ytrain, dat$xtest, dat$ytest, 
+                             var.names = item.names, tuneGrid = tuneGrid, inter = inter)
+    facetsR2 <- fitENET.caret(facetsTrain, dat$ytrain, facetsTest, dat$ytest, 
+                              var.names = facet.names, tuneGrid = tuneGrid, inter = inter)
+    domainsR2 <- fitENET.caret(domainsTrain, dat$ytrain, domainsTest, dat$ytest, 
+                               var.names = domain.names, tuneGrid = tuneGrid, inter = inter)
   }
 
 
@@ -441,261 +523,27 @@ myENET <- function(x1, y, pTrain = .75, model = "caret",
 }
 
 ################################################################################
-# fit model only without leakage
-# thus, stick to Hang & Mottus cv! (i.e., fixed alpha and varying lambda)
+# run analysis
 ################################################################################
-enetNOleak <- function(x1, y, pTrain = .75, inter = FALSE){
-  # # test it
-  # sex <- ifelse(adata$sex == 1, 0, 1) # as dummy
-  # x1 <- cbind(items, sex)
-  # y <- data$substance 
-  # pTrain = .75
-  
-  # split data in train & test
-  dat <- splitData(x1, y, pTrain)
-  
-  # median imputation AFTER splitting
-  dat <- medianImpute(dat$xtrain, dat$xtest, dat$ytrain, dat$ytest)
-  
-  # calculate facet and domain values for test and train separately
-  # unweighted sum scores to calculate facets and domains
-  facetsTrain <- getSumScores(dat$xtrain, facet.names)
-  facetsTest <- getSumScores(dat$xtest, facet.names)
-  
-  domainsTrain <- getSumScores(dat$xtrain, domain.names)
-  domainsTest <- getSumScores(dat$xtest, domain.names)
-  
-  # z-standardising data AFTER splitting
-  # scale by default does centering and standardising
-  # do this after imputation of missing values and separately for training and test data
-  dat$xtrain = sapply(dat$xtrain, scale) # z-Standardisierung
-  dat$xtest = sapply(dat$xtest,scale) # z-Standardisierung
-  
-  facetsTrain = sapply(facetsTrain, scale) # z-Standardisierung
-  facetsTest = sapply(facetsTest, scale) # z-Standardisierung
-  
-  domainsTrain = sapply(domainsTrain, scale) # z-Standardisierung
-  domainsTest = sapply(domainsTest, scale) # z-Standardisierung
-  
-  # only covariates to add to facet and domain data (already standardized)
-  covarTrain <- dat$xtrain[,!(colnames(dat$xtrain) %in% item.names)]
-  covarTest <- dat$xtest[,!(colnames(dat$xtest) %in% item.names)] 
-  
-  # add covariates to facet and domain data
-  # this works as well if there are no covariates in the data
-  facetsTrain <- cbind(facetsTrain, covarTrain)
-  domainsTrain <- cbind(domainsTrain, covarTrain)
-  
-  facetsTest <- cbind(facetsTest, covarTest)
-  domainsTest <- cbind(domainsTest, covarTest)
-  
-  # fit elastic net regression with standard tuning of lambda and fixed alpha (close to ridge)
-  itemsR2 <- fitENET.glmnet(dat$xtrain, dat$ytrain, dat$xtest, dat$ytest, inter)
-  facetsR2 <- fitENET.glmnet(facetsTrain, dat$ytrain, facetsTest, dat$ytest, inter)
-  domainsR2 <- fitENET.glmnet(domainsTrain, dat$ytrain, domainsTest, dat$ytest, inter)
-  
-  # square correlations of predicted and true criterion values to arrive at R² values
-  cbind(domainsR2, facetsR2, itemsR2)
-}
-
-################################################################################
-# fit model
-# without leakage and with fixed cross-validation of alpha and lambda
-# R² as outcome; not only correlation of predicted and actual criterion values
-################################################################################
-
-# fit data with caret (without leakage)
-# -> missing data imputation for train and test separately
-# -> z-Standardizing for train and test separately
-enetCaret <- function(x1, y, pTrain = .75, inter = FALSE) {
-  
-  # split data in train & test
-  dat <- splitData(x1, y, pTrain)
-  
-  # median imputation AFTER splitting
-  dat <- medianImpute(dat$xtrain, dat$xtest, dat$ytrain, dat$ytest)
-  
-  # calculate facet and domain values for test and train separately
-  # unweighted sum scores to calculate facets and domains
-  facetsTrain <- getSumScores(dat$xtrain, facet.names)
-  facetsTest <- getSumScores(dat$xtest, facet.names)
-  
-  domainsTrain <- getSumScores(dat$xtrain, domain.names)
-  domainsTest <- getSumScores(dat$xtest, domain.names)
-  
-  # z-standardising data AFTER splitting
-  # scale by default does centering and standardising
-  # do this after imputation of missing values and separately for training and test data
-  dat$xtrain = sapply(dat$xtrain, scale) # z-Standardisierung
-  dat$xtest = sapply(dat$xtest,scale) # z-Standardisierung
-  
-  facetsTrain = sapply(facetsTrain, scale) # z-Standardisierung
-  facetsTest = sapply(facetsTest, scale) # z-Standardisierung
-  
-  domainsTrain = sapply(domainsTrain, scale) # z-Standardisierung
-  domainsTest = sapply(domainsTest, scale) # z-Standardisierung
-  
-  # only covariates to add to facet and domain data (already standardized)
-  covarTrain <- dat$xtrain[,!(colnames(dat$xtrain) %in% item.names)]
-  covarTest <- dat$xtest[,!(colnames(dat$xtest) %in% item.names)] 
-  
-  # add covariates to facet and domain data
-  # this works as well if there are no covariates in the data
-  facetsTrain <- cbind(facetsTrain, covarTrain)
-  domainsTrain <- cbind(domainsTrain, covarTrain)
-  
-  facetsTest <- cbind(facetsTest, covarTest)
-  domainsTest <- cbind(domainsTest, covarTest)
-  
-  # adjust variable names 
-  #   data.frame as input to caret needs identical variable names in train and test
-  #   data (which need to be fixed, otherwise covarTrain != covarTest)
-  covNames <- colnames(xtrain)[!(colnames(xtrain) %in% item.names)]
-  colnames(facetsTrain) <- colnames(facetsTest) <- c(facet.names, covNames) 
-  colnames(domainsTrain) <- colnames(domainsTest) <- c(domain.names, covNames) 
-  
-  # fit glmnet with caret
-  itemsR2 <- fitENET.caret(xtrain, ytrain, xtest, ytest, 
-                           tuneGrid = tuneGrid, inter = inter)
-  facetsR2 <- fitENET.caret(facetsTrain, ytrain, facetsTest, ytest, 
-                            tuneGrid = tuneGrid, inter = inter)
-  domainsR2 <- fitENET.caret(domainsTrain, ytrain, domainsTest, ytest, 
-                             tuneGrid = tuneGrid, inter = inter)
-  
-  cbind(domainsR2, facetsR2, itemsR2)
-}
-
-# Warning message:
-# In nominalTrainWorkflow(x = x, y = y, wts = weights, info = trainInfo,  :
-#                         There were missing values in resampled performance measures.
-#   This error happens when the model didn't converge in some cross-validation folds 
-#   the predictions get zero variance. As a result, the metrics like RMSE or Rsquared 
-#   can't be calculated so they become NAs
-# -> these tuning parameters do not get chosen. but the model itself works fine
-# taking a closer look on the cv models indicates that large values of lambda result 
-#     in this issue; for small lambda values, every alpha converges
-
-################################################################################
-# run analysis with factor scores instead of sum scores 
-# factor scores either for
-################################################################################
-# multiple group CFA cannot be estimated for test data due to small sample sizes 
-#   -> 240 items and only 132 observations in one group 
-factorNames <- list(first = facet.names, 
-                    second = domain.names)
-
-facetModel <- genModel(factorNames, p)
-
-enetCaret.FS <- function(x1, y, p=.75, multipleGroup = FALSE) {
-  # sample by default does sampling without replacement
-  # split into train and validation data set by index
-  s = sample(nrow(x1), p*nrow(x1)) 
-  
-  # if(is.null(x2)) x2 = x1 # copy x1 to get the test data if selection by index
-  
-  xtrain <- x1[s,]
-  ytrain <- y[s]
-  
-  xtest <- x1[-s,]
-  ytest <- y[-s]
-  
-  # imputation with median = median replace (impute missing values with median values)! 
-  # do this separately for training and test data!
-  # all missing values are removed
-  xtrain = data.frame(xtrain) %>% 
-    mutate_if(is.numeric, list(~ replace(., is.na(.), median(., na.rm = TRUE))))
-  
-  xtest = data.frame(xtest) %>% 
-    mutate_if(is.numeric, list(~ replace(., is.na(.), median(., na.rm = TRUE))))
-  
-  # scale by default does centering and standardising
-  # do this after imputation of missing values and separately for training and test data
-  xtrain = sapply(xtrain, scale) # z-Standardisierung
-  xtest = sapply(xtest,scale) # z-Standardisierung
-  
-  # only covariates to add to facet and domain data
-  covarTrain <- xtrain[,!(colnames(xtrain) %in% item.names)]
-  covarTest <- xtest[,!(colnames(xtest) %in% item.names)] 
-  
-  # calculate facet and domain values for test and train separately
-  # fit CFA with second order factors based on covariance matrix 
-  
-  if (multipleGroup) {
-    fitTrain <- lavaan::cfa(facetModel, 
-                            data = xtrain, 
-                            se = "none",
-                            group = "sex")  
-    fitTest <- lavaan::cfa(facetModel, 
-                           data = xtest, 
-                           se = "none",
-                           group = "sex")
-  } else {
-    fitTrain <- lavaan::cfa(facetModel, 
-                            data = xtrain, 
-                            se = "none")
-    fitTest <- lavaan::cfa(facetModel, 
-                           data = xtest, 
-                           se = "none")
-  }
-  
-  # predict factor scores based in cfa model of the data
-  fsTrain <- lavPredict(fitTrain, method = "Bartlett") 
-  fsTest <- lavPredict(fitTest, method = "Bartlett") 
-  
-  # extract only facet or only domain scores
-  facetsTrain <- fsTrain[,colnames(fsTrain) %in% facet.names]
-  facetsTest <- fsTest[,colnames(fsTest) %in% facet.names]
-  domainsTrain <- fsTrain[,colnames(fsTrain) %in% domain.names]
-  domainsTest <- fsTest[,colnames(fsTest) %in% domain.names]
-  
-  # add covariates to facet and domain data
-  # this works as well if there are no covariates in the data
-  facetsTrain <- cbind(facetsTrain, covarTrain)
-  domainsTrain <- cbind(domainsTrain, covarTrain)
-  
-  facetsTest <- cbind(facetsTest, covarTest)
-  domainsTest <- cbind(domainsTest, covarTest)
-  
-  # adjust variable names 
-  #   data.frame as input to caret needs identical variable names in train and test
-  #   data (which need to be fixed, otherwise covarTrain != covarTest)
-  covNames <- colnames(xtrain)[!(colnames(xtrain) %in% item.names)]
-  colnames(facetsTrain) <- colnames(facetsTest) <- c(facet.names, covNames) 
-  colnames(domainsTrain) <- colnames(domainsTest) <- c(domain.names, covNames) 
-  
-  # fit glmnet with caret
-  itemsR2 <- fitENET(cbind(xtrain, ytrain = ytrain), 
-                     xtest, ytest, tuneGrid = tuneGrid)
-  facetsR2 <- fitENET(cbind(facetsTrain, ytrain = ytrain), 
-                      facetsTest, ytest, tuneGrid = tuneGrid)
-  domainsR2 <- fitENET(cbind(domainsTrain, ytrain = ytrain), 
-                       domainsTest, ytest, tuneGrid = tuneGrid)
-  
-  cbind(domainsR2, facetsR2, itemsR2)
-}
-
-################################################################################
-# do analysis
-################################################################################
-# only add sex as a covariate; age did not improve prediction in any condition
-#   age is not correlated with any of the outcomes... 
-
-
 # add covariates that might result in measurement invariance
 sex <- ifelse(adata$sex == 1, 0, 1) # as dummy
 dataVec <- list(NULL, "sex") # thus reduce data set further in every iteration
 
 # ! if there is no covariate we cannot add inter = TRUE since there are no interactions
 # therefore remove these conditions (otherwise inter = FALSE condition would be run twice)
-expand.grid(model = c("glmnet", "caret"), 
-            factorScores = c(FALSE, TRUE),
-            inter = c(FALSE, TRUE))
+conditionGrid <- expand.grid(model = c("glmnet", "caret"), 
+                               factorScores = c(FALSE, TRUE),
+                               inter = c(FALSE, TRUE),
+                               covariate = dataVec) # ! NULL is with covariate; "sex" means that "sex" is removed
+conditionGrid <- conditionGrid[!(conditionGrid$covariate == "sex" & 
+                                   conditionGrid$inter == TRUE), ]
+conditionGrid <- conditionGrid[conditionGrid$factorScores == FALSE, ]
 
 # criterion to predict with ENET
 criterionVec <- list(data$p_factor, data$intern, data$psych, data$substance)
 nReps <- 100
 
-nCoresSampling <- 20
+nCoresSampling <- 30
 timeStamp <- format(Sys.time(), "%d%m%y_%H%M%S")
 outfileCL <- paste0(logFolder, "/", "fitDataStatus", timeStamp, ".txt")
 cl <- parallel::makeCluster(nCoresSampling, type = "FORK",
@@ -712,44 +560,48 @@ clusterSetRNGStream(cl = cl, iseed = s)
 myUser <- "kls"
 nProcs <- nCoresSampling
 
-resR2 <- lapply(seq_along(dataVec), function(iData) {
+resR2 <- lapply(seq_len(dim(conditionGrid)[1]), function(iCond) {
+  print(paste0("now running: condition ", iCond, "; which means model ", conditionGrid[iCond, "model"],
+        ", factorScores = ", conditionGrid[iCond, "factorScores"], 
+        " and interaction = ", conditionGrid[iCond, "inter"]))
+  
   # add sex to the data
   items <- cbind(items, sex)
   
-  topRes <- NCmisc::top(CPU = F,Table = T, procs = nProcs)$Table
-  idxUSER <- which(topRes$"USER" == myUser & 
-                     topRes$"COMMAND" == "rsession")
-  sink(file = outfileCL, append = T, type = c("output", "message"))
-  print(system('free -m', intern = T))
-  # print(NCmisc::top(Table = T))
-  print(topRes[idxUSER, c("PID", "USER", "%CPU", "%MEM")])
-  sink(file = NULL)
-  
   # remove extra predictors for each iteration (depending on condition)
-  items[,c(dataVec[[iData]])] <- list(NULL)
+  items[,conditionGrid[[iCond, "covariate"]]] <- list(NULL)
   
   TMP <- lapply(seq_along(criterionVec), function(iCrit) {
     
     tmp <- parLapply(cl, seq_len(nReps), function(iRep) {
       #lapply(seq_len(nReps), function(iRep) {
       
-      myENET(items, y = criterionVec[[iCrit]], pTrain = 0.75)
+      myENET(items, y = criterionVec[[iCrit]], pTrain = 0.75,
+             model = conditionGrid[iCond, "model"], 
+             factorScores = conditionGrid[iCond, "factorScores"], 
+             inter = conditionGrid[iCond, "inter"])
     })
     do.call(rbind, tmp)
   })
   names(TMP) <- c("pFactor", "intern", "psych", "substance")
   
   # remove all extra variables before the next iteration for different data set starts
-  items[,c(dataVec[[2]])] <- list(NULL)
+  items[,"sex"] <- list(NULL)
   
   TMP
 })
 
-names(resR2) <- c("sexANDage", "onlySex", "onlyAge", "none")
-
 stopCluster(cl)
 
+condNames <- paste0("model.", ifelse(conditionGrid[, "model"] == "glmnet", "noLeak", "alphaCV"), 
+                    "_fs.", conditionGrid[, "factorScores"],
+                    "_inter.", conditionGrid[, "inter"],
+                    "_covariate.", ifelse(conditionGrid[, "covariate"] == "NULL", "sex", "none"))
+names(resR2) <- condNames
 
+################################################################################
+# anaylse results
+################################################################################
 # compare results with different predictor sets
 pFactor <- rbindResults(resR2, "pFactor")
 intern <- rbindResults(resR2, "intern")
@@ -758,13 +610,14 @@ substance <- rbindResults(resR2, "substance")
 
 predRes <- rbind(pFactor, intern, psych, substance)
 
-idxCondVec <- c("onlySex", "none")
+# idxCondVec <- c("onlySex", "none")
+idxCondVec <- condNames
 
 predRes$idxCond <- plyr::mapvalues(predRes$idxCond, 
                                    from = unique(predRes$idxCond), 
                                    to = idxCondVec)
 
-# save(predRes, file = "Dataset/caretResultsPerSample.rda")
+# save(predRes, file = "Dataset/resultsPerSample_nReps5.rda")
 str(predRes)
 colnames(predRes) <- c("domainsR2", "facetsR2", "itemsR2", "idxCond", "measure")
 
@@ -809,7 +662,7 @@ str(plotRes)
 original <- cbind(domainsR2 = c(0.50, 0.03, 0.61, 0.03, 0.11, 0.04, 0.32, 0.03),
                   facetsR2 = c(0.51, 0.03, 0.67, 0.02, 0.22, 0.04, 0.41, 0.03), 
                   itemsR2 = c(0.53, 0.02, 0.69, 0.02, 0.27, 0.04, 0.48, 0.03), 
-                  idxCond = rep("original", 4*2),
+                  idxCond = rep("model.original_fs.FALSE_inter.FALSE_covariate.none", 4*2),
                   measure = rep(c("pFactor", "intern", "psych", "substance"), each = 2),
                   rowNames = rep(c("M", "SE"), times = length(criterionVec)))
 
@@ -834,17 +687,33 @@ plotRes[col2num] <- lapply(plotRes[col2num], as.numeric)
 col2fac <- c("idxCond", "measure", "levels")
 plotRes[col2fac] <- lapply(plotRes[col2fac], factor)
 
-plotRes$idxCond <- factor(plotRes$idxCond, 
-                          levels = c("original", "none", "onlyAge", "onlySex", "sexANDage"),
-                          labels = c("original", "replicate", "+Age", "+Sex", "+Age+Sex"))
+plotRes <- tidyr::separate(plotRes, idxCond, 
+                           into = c("model", "factorScores", "interaction", "covariate"),
+                           sep = "_",
+                           remove = T)
+
+plotRes$model <- stringr::str_remove(plotRes$model, "model.")
+plotRes$factorScores <- stringr::str_remove(plotRes$factorScores, "fs.")
+plotRes$interaction <- stringr::str_remove(plotRes$interaction, "inter.")
+plotRes$covariate <- stringr::str_remove(plotRes$covariate, "covariate.")
+
+plotRes <- tidyr::unite(plotRes, "modelConfig", c(model, covariate), 
+                        sep = ".", remove = F)
+unique(plotRes$modelConfig)
+plotRes$modelConfig <- factor(plotRes$modelConfig, 
+                          levels = c("original.none", "alphaCV.sex", "noLeak.sex", "alphaCV.none", "noLeak.none"))
 
 colValVec <- c("black", '#339900', '#0000FF', '#9900CC', '#FF0000')
+
+unique(plotRes$factorScores) # ignore factorScores
+unique(plotRes$interaction) # ignore factorScores
 
 # plot results
 (pCompare <- ggplot(plotRes[plotRes$levels != "diffDomains" &
                               plotRes$levels != "diffFacets", ], 
                     aes(x = levels, y = M, 
-                        group = idxCond, colour = idxCond, linetype = idxCond)) +
+                        group = interaction(modelConfig, interaction),
+                        colour = modelConfig, linetype = interaction)) +
     geom_point(size = 2) +
     geom_line() +
     scale_color_manual(values = colValVec) +
@@ -869,13 +738,13 @@ colValVec <- c("black", '#339900', '#0000FF', '#9900CC', '#FF0000')
 #                 height = 9.41,
 #                 units = "in")
 
-# leakage fixed and tuning fixed
-save(plotRes, file = "Dataset/plotCaretResults.rda")
-ggplot2::ggsave(filename = paste0(plotFolder, "/caretRepResults.png"),
-                plot = pCompare,
-                width = 10.5,
-                height = 9.41,
-                units = "in")
+# # leakage fixed and tuning fixed
+# save(plotRes, file = "Dataset/plotCaretResults.rda")
+# ggplot2::ggsave(filename = paste0(plotFolder, "/caretRepResults.png"),
+#                 plot = pCompare,
+#                 width = 10.5,
+#                 height = 9.41,
+#                 units = "in")
 
 # Take Away:
 # leakage did not a lot of damage to the results
@@ -923,154 +792,3 @@ cor(sex, data$intern)
 # andere Variablen explizit erheben: 
 #     pro: 
 
-################################################################################
-# run analysis with factor scores instead of sum scores 
-# factor scores either for
-################################################################################
-# multiple group CFA cannot be estimated for test data due to small sample sizes 
-#   -> 240 items and only 132 observations in one group 
-factorNames <- list(first = facet.names, 
-                    second = domain.names)
-
-facetModel <- genModel(factorNames, p)
-
-enetCaret.FS <- function(x1, y, p=.75, multipleGroup = FALSE) {
-  # sample by default does sampling without replacement
-  # split into train and validation data set by index
-  s = sample(nrow(x1), p*nrow(x1)) 
-  
-  # if(is.null(x2)) x2 = x1 # copy x1 to get the test data if selection by index
-  
-  xtrain <- x1[s,]
-  ytrain <- y[s]
-  
-  xtest <- x1[-s,]
-  ytest <- y[-s]
-  
-  # imputation with median = median replace (impute missing values with median values)! 
-  # do this separately for training and test data!
-  # all missing values are removed
-  xtrain = data.frame(xtrain) %>% 
-    mutate_if(is.numeric, list(~ replace(., is.na(.), median(., na.rm = TRUE))))
-  
-  xtest = data.frame(xtest) %>% 
-    mutate_if(is.numeric, list(~ replace(., is.na(.), median(., na.rm = TRUE))))
-  
-  # scale by default does centering and standardising
-  # do this after imputation of missing values and separately for training and test data
-  xtrain = sapply(xtrain, scale) # z-Standardisierung
-  xtest = sapply(xtest,scale) # z-Standardisierung
-  
-  # only covariates to add to facet and domain data
-  covarTrain <- xtrain[,!(colnames(xtrain) %in% item.names)]
-  covarTest <- xtest[,!(colnames(xtest) %in% item.names)] 
-  
-  # calculate facet and domain values for test and train separately
-  # fit CFA with second order factors based on covariance matrix 
-  
-  if (multipleGroup) {
-    fitTrain <- lavaan::cfa(facetModel, 
-                            data = xtrain, 
-                            se = "none",
-                            group = "sex")  
-    fitTest <- lavaan::cfa(facetModel, 
-                           data = xtest, 
-                           se = "none",
-                           group = "sex")
-  } else {
-    fitTrain <- lavaan::cfa(facetModel, 
-                            data = xtrain, 
-                            se = "none")
-    fitTest <- lavaan::cfa(facetModel, 
-                           data = xtest, 
-                           se = "none")
-  }
-  
-  # predict factor scores based in cfa model of the data
-  fsTrain <- lavPredict(fitTrain, method = "Bartlett") 
-  fsTest <- lavPredict(fitTest, method = "Bartlett") 
-  
-  # extract only facet or only domain scores
-  facetsTrain <- fsTrain[,colnames(fsTrain) %in% facet.names]
-  facetsTest <- fsTest[,colnames(fsTest) %in% facet.names]
-  domainsTrain <- fsTrain[,colnames(fsTrain) %in% domain.names]
-  domainsTest <- fsTest[,colnames(fsTest) %in% domain.names]
-  
-  # add covariates to facet and domain data
-  # this works as well if there are no covariates in the data
-  facetsTrain <- cbind(facetsTrain, covarTrain)
-  domainsTrain <- cbind(domainsTrain, covarTrain)
-  
-  facetsTest <- cbind(facetsTest, covarTest)
-  domainsTest <- cbind(domainsTest, covarTest)
-  
-  # adjust variable names 
-  #   data.frame as input to caret needs identical variable names in train and test
-  #   data (which need to be fixed, otherwise covarTrain != covarTest)
-  covNames <- colnames(xtrain)[!(colnames(xtrain) %in% item.names)]
-  colnames(facetsTrain) <- colnames(facetsTest) <- c(facet.names, covNames) 
-  colnames(domainsTrain) <- colnames(domainsTest) <- c(domain.names, covNames) 
-  
-  # fit glmnet with caret
-  itemsR2 <- fitENET(cbind(xtrain, ytrain = ytrain), 
-                     xtest, ytest, tuneGrid = tuneGrid)
-  facetsR2 <- fitENET(cbind(facetsTrain, ytrain = ytrain), 
-                      facetsTest, ytest, tuneGrid = tuneGrid)
-  domainsR2 <- fitENET(cbind(domainsTrain, ytrain = ytrain), 
-                       domainsTest, ytest, tuneGrid = tuneGrid)
-  
-  cbind(domainsR2, facetsR2, itemsR2)
-}
-
-sex <- ifelse(adata$sex == 1, 0, 1) # as dummy
-items <- cbind(items, sex)
-
-# criterion to predict with ENET
-criterionVec <- list(data$p_factor, data$intern, data$psych, data$substance)
-nReps <- 100
-
-nCoresSampling <- 10
-timeStamp <- format(Sys.time(), "%d%m%y_%H%M%S")
-outfileCL <- paste0("log", "/", "fitDataStatus", timeStamp,".txt")
-cl <- parallel::makeCluster(nCoresSampling, type = "FORK",
-                            outfile = outfileCL)
-
-# set seed that works for parallel processing
-set.seed(3940904)
-s <- .Random.seed
-clusterSetRNGStream(cl = cl, iseed = s)
-
-
-predResFS <- lapply(seq_along(criterionVec), function(iCrit) {
-  
-  tmp <- parLapply(cl, seq_len(nReps), function(iRep) {
-    # tmp <- lapply(seq_len(nReps), function(iRep) {
-    
-    # run analysis with factor scores from CFA model (separately for train and test)
-    #   with leakage fix and tuning fix
-    enetCaret.FS(items, criterionVec[[iCrit]], p=.75)  # leakage and tuning fixed
-  })
-  
-  topRes <- NCmisc::top(CPU = F,Table = T, procs = nProcs)$Table
-  idxUSER <- which(topRes$"USER" == myUser & 
-                     topRes$"COMMAND" == "rsession")
-  sink(file = outfileCL, append = T, type = c("output", "message"))
-  print(system('free -m', intern = T))
-  # print(NCmisc::top(Table = T))
-  print(topRes[idxUSER, c("PID", "USER", "%CPU", "%MEM")])
-  sink(file = NULL)
-  
-  do.call(rbind, tmp)
-})
-names(predResFS) <- c("pFactor", "intern", "psych", "substance")
-
-stopCluster(cl)
-
-# results from factor scores are basically the same as for sum scores
-# we cannot estimate multiple group CFA due to small sample sizes in one of the 
-#     sex groups which means that there are more parameters than informations to 
-#     fit the model
-# we might try to fit the model for only one domain as multiple group and then 
-#     predict the outcome based on this domain with multiple group factor scores
-#     or factor scores that ignore measurement invariance violations
-#   -> however, this does not have high priority 
