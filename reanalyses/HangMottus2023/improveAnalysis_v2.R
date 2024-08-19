@@ -127,7 +127,7 @@ axis(1, at = 1:10, labels = 1:10)
 #build bifactor model with 3 specific factors
 efa_dsm <- psych::omega(data, fm="minres", nfactors = 3, poly = F)
 
-#extract factors scores for further analysis
+#extract factors scores for furt"The tuning parameter grid should have columns"her analysis
 efa_scores <- as.data.frame(psych::factor.scores(data,
                                                  efa_dsm$schmid$sl)$scores)
 
@@ -318,18 +318,18 @@ save(resBeta, file = "Dataset/variableSelectionENET.rda")
 # to do: 
 # fix the tuning grid
 
-# default for regression is p/3
-maxMtry <- (ncol(items)/3)
-# maxMtry <- sqrt(ncol(items)) # for classification
-
-tuneGridRF <- expand.grid(# number of variables randomly sampled as candidates at each split
-                        mtry = c(1, 10, 30, 45, 60, 80), 
-                        # number of trees to grow (how big is ensemble to average across) 
-                        ntree = c(100, 300, 600, 1000, 2000), 
-                        # minimum size of terminal nodes
-                        nodesize = c(5, 25, 50, 100))
-
-tundGridRF <- data.frame(mtry = c(1, 10, 30, 45, 60, 80))
+# # default for regression is p/3
+# maxMtry <- (ncol(items)/3)
+# # maxMtry <- sqrt(ncol(items)) # for classification
+# 
+# tuneGridRF <- expand.grid(# number of variables randomly sampled as candidates at each split
+#                         mtry = c(1, 10, 30, 45, 60, 80), 
+#                         # number of trees to grow (how big is ensemble to average across) 
+#                         ntree = c(100, 300, 600, 1000, 2000), 
+#                         # minimum size of terminal nodes
+#                         nodesize = c(5, 25, 50, 100))
+# 
+# tundGridRF <- data.frame(mtry = c(1, 10, 30, 45, 60, 80))
 
 randomForestPrediction <- function(x1, y, pTrain = 0.75) {
   # # test it
@@ -365,14 +365,144 @@ randomForestPrediction <- function(x1, y, pTrain = 0.75) {
   
   # fit random forest with caret
   itemsR2 <- fitRF.caret(dat$xtrain, dat$ytrain, dat$xtest, dat$ytest, 
-                           tuneGrid = tuneGridRF)
+                           tuneGrid = data.frame(mtry = c(10, 40, 80)))
   facetsR2 <- fitRF.caret(facetsTrain, dat$ytrain, facetsTest, dat$ytest, 
-                            tuneGrid = tuneGridRF)
+                            tuneGrid = data.frame(mtry = c(2, 5, 10)))
   domainsR2 <- fitRF.caret(domainsTrain, dat$ytrain, domainsTest, dat$ytest, 
-                             tuneGrid = tuneGridRF)
+                             tuneGrid = data.frame(mtry = c(1, 2)))
   
   return(cbind(domainsR2, facetsR2, itemsR2))
 }
+
+# add covariates that might result in measurement invariance
+sex <- ifelse(adata$sex == 1, 0, 1) # as dummy
+dataVec <- list(NULL, "sex") # thus reduce data set further in every iteration
+
+criterionVec <- list(data$p_factor, data$intern, data$psych, data$substance)
+nReps <- 100
+
+nCoresSampling <- 30
+timeStamp <- format(Sys.time(), "%d%m%y_%H%M%S")
+outfileCL <- paste0(logFolder, "/", "fitDataStatus", timeStamp, ".txt")
+cl <- parallel::makeCluster(nCoresSampling, type = "FORK",
+                            outfile = outfileCL)
+
+nProcs = nCoresSampling
+myUser = "kls"
+
+# set seed that works for parallel processing
+set.seed(3940904)
+s <- .Random.seed
+clusterSetRNGStream(cl = cl, iseed = s)
+
+resRF <- lapply(seq_along(dataVec), function(iData) {
+  
+  # add sex to the data
+  items <- cbind(items, sex)
+
+  # remove extra predictors for each iteration (depending on condition)
+  items[,dataVec[iData]] <- list(NULL) 
+  
+  TMP <- lapply(seq_along(criterionVec), function(iCrit) {
+    
+    tmp <- parLapply(cl, seq_len(nReps), function(iRep) {
+      randomForestPrediction(items, y = criterionVec[[iCrit]], pTrain = 0.75)
+    })
+    do.call(rbind, tmp)
+  
+  })  
+  names(TMP) <- c("pFactor", "intern", "psych", "substance")
+  
+  # remove all extra variables before the next iteration for different data set starts
+  items[,"sex"] <- list(NULL)
+  
+  TMP
+})
+names(resRF) <- c("sex", "none")
+
+stopCluster(cl)
+
+save(resRF, file = "Dataset/randomForestResults_withInter.rda")
+
+# to do: 
+# run random forests with sex as an additional predictor too; this is only without sex as an additional predictor
+# compare results with different predictor sets
+
+# # load data without covariate sex
+# load("Dataset/randomForestResults.rda")
+
+
+predResRF <- data.frame(rbind(cbind(resRF[["pFactor"]], rep("pFactor", times = 100)),
+                              cbind(resRF[["intern"]], rep("intern", times = 100)),
+                              cbind(resRF[["psych"]], rep("psych", times = 100)),
+                              cbind(resRF[["substance"]], rep("substance", times = 100))))
+
+# pFactor <- rbindResults(resRF, "pFactor")
+# intern <- rbindResults(resRF, "intern")
+# psych <- rbindResults(resRF, "psych")
+# substance <- rbindResults(resRF, "substance")
+# 
+# predResRF <- rbind(pFactor, intern, psych, substance)
+
+# idxCondVec <- c("onlySex", "none")
+# idxCondVec <- condNames
+# 
+# predResRF$idxCond <- plyr::mapvalues(predResRF$idxCond, 
+#                                      from = unique(predResRF$idxCond), 
+#                                      to = idxCondVec)
+
+# colnames(predResRF) <- c("domains", "facets", "items", "idxCond", "measure")
+
+colnames(predResRF) <- c("domains", "facets", "items", "measure")
+
+col2num <- c("domains", "facets", "items")
+predResRF[col2num] <- lapply(predResRF[col2num], as.numeric)
+
+# col2fac <- c("idxCond", "measure")
+col2fac <- c("measure")
+predResRF[col2fac] <- lapply(predResRF[col2fac], factor)
+
+plotRes <- aggregate(cbind(domains, facets, items) ~ measure, 
+                     data = predResRF, function(x) {cbind(mean(x), 
+                                                          sd(x))})
+
+plotRes <- do.call(data.frame, plotRes)
+colnames(plotRes) <- stringr::str_replace_all(colnames(plotRes), "\\.1", "_M")
+colnames(plotRes) <- stringr::str_replace_all(colnames(plotRes), "\\.2", "_SE")
+
+plotRes <- tidyr::pivot_longer(plotRes, 
+                               cols = !measure,
+                               names_to = c("levels", "DV"), 
+                               names_sep = "_",
+                               values_to = "values")
+
+plotRes <- tidyr::pivot_wider(plotRes,
+                              names_from = DV, 
+                              values_from = values)
+
+(ggplot(plotRes, 
+       aes(x = levels, y = M, 
+           group = measure,
+           colour = measure, linetype = measure)) +
+  geom_point(size = 2) +
+  geom_line() +
+  #scale_color_manual(values = colValVec) +
+  ylab("average test R²") +
+  geom_errorbar(aes(ymin = M - 2*SE, ymax = M + 2*SE), width = 0.2) +
+  theme(panel.grid.major = element_line(linewidth = 0.5, linetype = 'solid', color = "grey"), 
+        panel.grid.minor = element_line(linewidth = 0.25, linetype = 'solid', color = "grey"),
+        panel.background = element_rect(color = "white", fill = "white"),
+        axis.text.y = element_text(size = 20),
+        axis.text.x = element_text(size = 20),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        strip.text.x = element_text(size = 15),
+        strip.text.y = element_text(size = 15)))
+
+# auch für Random Forest Regression verschwindet der Vorteil von Items nicht
+#   Item Vorteil im Vergleich zu Composites nicht durch komplexe Interaktionen etc. 
+#   erklärbar
+# run this again with covariate (which already includes interactions in this case)
 
 ################################################################################
 # fit model 
@@ -599,9 +729,18 @@ condNames <- paste0("model.", ifelse(conditionGrid[, "model"] == "glmnet", "noLe
                     "_covariate.", ifelse(conditionGrid[, "covariate"] == "NULL", "sex", "none"))
 names(resR2) <- condNames
 
+# # save data 
+# # 100 repetitions
+# # noLeakage modelled with glmnet vs. model including cross validation of alpha in caret
+# # with or without interaction of sex with every item, facet or domain, respectively
+# save(resR2, file = "Dataset/resultsPerSample_sex_noLeakVSalphaCV_inter.rda")
+
 ################################################################################
 # anaylse results
 ################################################################################
+# load data and start from here 
+load("Dataset/resultsPerSample_sex_noLeakVSalphaCV_inter.rda")
+
 # compare results with different predictor sets
 pFactor <- rbindResults(resR2, "pFactor")
 intern <- rbindResults(resR2, "intern")
@@ -619,21 +758,21 @@ predRes$idxCond <- plyr::mapvalues(predRes$idxCond,
 
 # save(predRes, file = "Dataset/resultsPerSample_nReps5.rda")
 str(predRes)
-colnames(predRes) <- c("domainsR2", "facetsR2", "itemsR2", "idxCond", "measure")
+colnames(predRes) <- c("domains", "facets", "items", "idxCond", "measure")
 
-col2num <- c("domainsR2", "facetsR2", "itemsR2")
+col2num <- c("domains", "facets", "items")
 predRes[col2num] <- lapply(predRes[col2num], as.numeric)
 
 col2fac <- c("idxCond", "measure")
 predRes[col2fac] <- lapply(predRes[col2fac], factor)
 
-predRes$diffDomains <- predRes$itemsR2 - predRes$domainsR2
-predRes$diffFacets <- predRes$itemsR2 - predRes$facetsR2
+predRes$diffDomains <- predRes$items - predRes$domains
+predRes$diffFacets <- predRes$items - predRes$facets
 
 range(predRes$diffDomains)
 range(predRes$diffFacets)
 
-plotRes <- aggregate(cbind(domainsR2, facetsR2, itemsR2, 
+plotRes <- aggregate(cbind(domains, facets, items, 
                            diffDomains, diffFacets) ~ idxCond + measure, 
                      data = predRes, function(x) {cbind(mean(x), 
                                                         sd(x),
@@ -659,9 +798,9 @@ plotRes <- tidyr::pivot_wider(plotRes,
 str(plotRes)
 
 # add original values
-original <- cbind(domainsR2 = c(0.50, 0.03, 0.61, 0.03, 0.11, 0.04, 0.32, 0.03),
-                  facetsR2 = c(0.51, 0.03, 0.67, 0.02, 0.22, 0.04, 0.41, 0.03), 
-                  itemsR2 = c(0.53, 0.02, 0.69, 0.02, 0.27, 0.04, 0.48, 0.03), 
+original <- cbind(domains = c(0.50, 0.03, 0.61, 0.03, 0.11, 0.04, 0.32, 0.03),
+                  facets = c(0.51, 0.03, 0.67, 0.02, 0.22, 0.04, 0.41, 0.03), 
+                  items = c(0.53, 0.02, 0.69, 0.02, 0.27, 0.04, 0.48, 0.03), 
                   idxCond = rep("model.original_fs.FALSE_inter.FALSE_covariate.none", 4*2),
                   measure = rep(c("pFactor", "intern", "psych", "substance"), each = 2),
                   rowNames = rep(c("M", "SE"), times = length(criterionVec)))
@@ -730,17 +869,16 @@ unique(plotRes$interaction) # ignore factorScores
           strip.text.x = element_text(size = 15),
           strip.text.y = element_text(size = 15)))
 
-# # only leakage fixed (but still without alpha tuning)
-# save(plotRes, file = "Dataset/plotNOleakResults.rda")
-# ggplot2::ggsave(filename = paste0(plotFolder, "/noLeakRepResults.png"),
+# # original data as correlation instead of R²
+# save(plotRes, file = "Dataset/plotResults_sex_noLeakVSalphaCV_inter.rda")
+# ggplot2::ggsave(filename = paste0(plotFolder, "/sex_noLeakVSalphaCV_inter.png"),
 #                 plot = pCompare,
 #                 width = 10.5,
 #                 height = 9.41,
 #                 units = "in")
 
-# # leakage fixed and tuning fixed
-# save(plotRes, file = "Dataset/plotCaretResults.rda")
-# ggplot2::ggsave(filename = paste0(plotFolder, "/caretRepResults.png"),
+# # with original data as squared correlations 
+# ggplot2::ggsave(filename = paste0(plotFolder, "/sex_noLeakVSalphaCV_inter_originalR2.png"),
 #                 plot = pCompare,
 #                 width = 10.5,
 #                 height = 9.41,
@@ -763,11 +901,11 @@ unique(plotRes$interaction) # ignore factorScores
 
 # sex uncorrelated with criterion without any effect
 # all correlations of age and any criterion are < 0.05
-cor(sex, data$p_factor)
-cor(sex, data$psych)
+cor(sex, data$p_factor) # 0.09802503
+cor(sex, data$psych) # -0.02821687
 # sex correlated with criterion with effect on prediction
-cor(sex, data$substance)
-cor(sex, data$intern)
+cor(sex, data$substance) # -0.2542565
+cor(sex, data$intern) # 0.2829462
 
 # man kann experimentell mit echten Daten nicht trennen, ob ...
 #     a. ... Outcome und Covariate korreliert sind und Covariate in Items widergespiegelt wird
