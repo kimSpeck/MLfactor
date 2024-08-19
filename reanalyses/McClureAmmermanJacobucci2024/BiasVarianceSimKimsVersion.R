@@ -54,6 +54,7 @@ require(MASS) #MASS for simulation
 # require(caret) # enet
 require(tidyr)
 require(ggplot2)
+require(grpnet)
 # source('../reanalysis/McClureAmmermanJacobucci2023/Simulation/Linear-Regression-Bias-Variance_functions.R')
 setwd("../reanalysis/McClureAmmermanJacobucci2023/Simulation/")
 #setwd("Dokumente/Promotion/MLfactor/reanalysis/McClureAmmermanJacobucci2023/Simulation/")
