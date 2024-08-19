@@ -1,5 +1,6 @@
 params <- list()
 
+params$nRep <- 500
 params$M = 1 # number of composite variables
 params$holdout = 1000 # hold out sample size
 
@@ -45,41 +46,105 @@ params$miWeight = c(0, -0.8, 1) # weight of measurement variant items
 params$mS <- 0
 params$mMI <- c(1, 2, 5, 10) 
 
-params$sigmaErrY = 1 #irreducible error variance
+#irreducible error variance (= error in the outcome)
+# for the "formative" model; R² is .9 and higher
+params$sigmaErrY = 1 
+# for the reflective model; R² is .9, .65, .5, .33
+params$sigmaErrY_ref <- c(0.01, 0.05, 0.1, 0.2) 
 
+# to simulate from kind of reflective measurement model (R^2 not dependent on number of items)
+# with the error variance from Jacobucci on the outcome (sigma^2_e = 1): 
+#   ... R^2 is around 0.1 without specific item effect
+#   ... R^2 is arount 0.5 with specific item effect
+# now, the specific item effect is really dominating the prediction
+# only simulating specific item effects on the outcome causes superiority of items 
+#     over the composite; no measurement invariance violation is able to cause item 
+#     superiority in terms of prediction
+# therefore, try increasing R² to the order of magnitude it had beforehand and compare 
+#     results again.
+# --> by reducing the error in Y, we can increase R²
+# # explained variance with varying error variance in the outcome for reflective model
+# sigmaErrY <- 0.01 # 0.899537 1.002019
+# sigmaErrY <- 0.2 # 0.3389238 0.8858312
+# sigmaErrY <- 0.1 # 0.4995846 0.9484514
+# sigmaErrY <- 0.05 # 0.6581100 0.9803542
 ################################################################################
 # get all simulation condition (as in original paper)
 # N.train x J x betaT x item specific effect x variance components 
 # 1000 conditions
-grid = expand.grid(N.train = params$N,
-                   J = params$J,
-                   betaT = params$betaT,
-                   betaS.cond = params$betaS.cond,
-                   measVar.cond = params$measVar.cond,
-                   MI = TRUE,
-                   nGroups = 1,
-                   miItems.cond = 0, 
-                   miWeight = NA,
-                   mSpecific = params$mS)
+# refSub <- rbind(cbind(sigmaErrY = params$sigmaErrY, reflective = FALSE), 
+#                 expand.grid(sigmaErrY = params$sigmaErrY_ref, reflective = TRUE))
+
+grid_noMIvio_form = expand.grid(N.train = params$N,
+                                J = params$J,
+                                betaT = params$betaT,
+                                betaS.cond = params$betaS.cond,
+                                measVar.cond = params$measVar.cond,
+                                # these are all parameters to turn MI violations off
+                                MI = TRUE,
+                                nGroups = 1,
+                                miItems.cond = 0, 
+                                miWeight = NA,
+                                mSpecific = params$mS, 
+                                sigmaErrY = params$sigmaErrY, 
+                                # "formative" model, therefore only sigmaErrY = 1
+                                reflective = FALSE) 
+
+grid_noMIvio_ref <- expand.grid(N.train = params$N,
+                                J = params$J,
+                                betaT = params$betaT,
+                                betaS.cond = params$betaS.cond,
+                                measVar.cond = params$measVar.cond,
+                                # these are all parameters to turn MI violations off
+                                MI = TRUE,
+                                nGroups = 1,
+                                miItems.cond = 0, 
+                                miWeight = NA,
+                                mSpecific = params$mS, 
+                                # reflectiv model, therefore sigmaErrY varies to manipulate R²
+                                sigmaErrY = params$sigmaErrY_ref, 
+                                reflective = TRUE)
 
 # add MI simulation conditions
-gridMI <- expand.grid(N.train = params$N,
-                      J = params$J,
-                      betaT = params$betaT,
-                      betaS.cond = params$betaS.cond,
-                      measVar.cond = params$measVar.cond,
-                      MI = FALSE,
-                      nGroups = params$nGroups,
-                      miItems.cond = params$miItems.cond,
-                      miWeight = params$miWeight,
-                      mSpecific = params$mMI)
+grid_MIvio_form <- expand.grid(N.train = params$N,
+                               J = params$J,
+                               betaT = params$betaT,
+                               betaS.cond = params$betaS.cond,
+                               measVar.cond = params$measVar.cond,
+                               # these are all parameters to turn MI violations on
+                               MI = FALSE,
+                               nGroups = params$nGroups, # two groups
+                               miItems.cond = params$miItems.cond, 
+                               miWeight = params$miWeight, # configural, metric, scalar
+                               mSpecific = params$mMI, # different degrees of scalar MI vio
+                               # "formative" model, therefore sigmaErrY varies to manipulate R²
+                               sigmaErrY = params$sigmaErrY,
+                               reflective = FALSE)
 
-params$gridFull <- rbind(grid, gridMI)
+grid_MIvio_ref <- expand.grid(N.train = params$N,
+                              J = params$J,
+                              betaT = params$betaT,
+                              betaS.cond = params$betaS.cond,
+                              measVar.cond = params$measVar.cond,
+                              # these are all parameters to turn MI violations on
+                              MI = FALSE,
+                              nGroups = params$nGroups, # two groups
+                              miItems.cond = params$miItems.cond, 
+                              miWeight = params$miWeight, # configural, metric, scalar
+                              mSpecific = params$mMI, # different degrees of scalar MI vio
+                              # reflectiv model, therefore sigmaErrY varies to manipulate R²
+                              sigmaErrY = params$sigmaErrY_ref, 
+                              reflective = TRUE)
+
+params$gridFull <- rbind(grid_noMIvio_form, grid_noMIvio_ref, 
+                         grid_MIvio_form, grid_MIvio_ref)
+dim(params$gridFull) # 185 000 conditions in total; we will only be abel to run a subset!!!
 
 # seed for every condition
 set.seed(784359) # seed for reproducibility of seeds
-params$gridFull$seed <- sample(843786, dim(params$gridFull)[1], replace = FALSE)
+params$gridFull$conditionSeed <- sample(843786, dim(params$gridFull)[1], replace = FALSE)
 # # check (has to be true)
 # length(unique(seed)) == dim(gridFull)[1]
 
-rm(grid, gridMI)
+rm(grid_noMIvio_form, grid_noMIvio_ref, 
+   grid_MIvio_form, grid_MIvio_ref)

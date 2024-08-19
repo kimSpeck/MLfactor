@@ -1,3 +1,10 @@
+# function to create folder for output, plots, logfiles
+createFolder <- function(folderPath) {
+  if (!file.exists(folderPath)){
+    dir.create(folderPath)
+  }
+}
+
 setBetaS <- function(betaS.cond, SigmaS, J, params) {
   # item specific effects; S - Y relationships
   if(betaS.cond == 1){ # all betaS = 0; no item effect 
