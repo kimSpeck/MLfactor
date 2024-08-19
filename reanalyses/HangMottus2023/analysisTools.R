@@ -191,12 +191,17 @@ fitRF.caret <- function(xtrain, ytrain, xtest, ytest, tuneGrid) {
                     trainData, 
                     method = 'rf', # random forest
                     # metric = 'RMSE', 
-                    trControl = trainControl(method='cv', # repetition is done manually
-                                             number=10, # nfolds
+                    trControl = trainControl(method = 'cv', # repetition is done manually
+                                             number = 10, # nfolds
                                              selectionFunction = "best"),
-                    # tuneGrid = tuneGrid,
-                    tuneGrid = data.frame(mtry = 80,
-                                          ntree = 500),
+                    tuneGrid = tuneGrid,
+                    # tuneGrid = data.frame(expand.grid(.mtry = c(1, 10, 30, 45, 60, 80), 
+                    #                       # number of trees to grow (how big is ensemble to average across) 
+                    #                       .ntree = c(100, 300, 600, 1000, 2000), 
+                    #                       # minimum size of terminal nodes
+                    #                       .nodesize = c(5, 25, 50, 100))),
+                    # tuneGrid = data.frame(mtry = c(5, 10, 40, 80)),
+                    ntree = 200,
                     verbose = FALSE) 
   
   predTMP <- predict(model.rf, xtest)
