@@ -1,5 +1,17 @@
 params <- list()
 
+###### new ###### 
+params$dgp$trueScore <- 1
+params$dgp$trueScoreLoad <- 1
+params$dgp$specificLoad <- 1
+params$dgp$nOutcome <- 1
+params$dgp$mY_g1 <- 0
+
+# we simulate a balanced design 
+params$dgp$nGroups <- 2
+params$dgp$varGroup <- 0.25
+
+######
 params$nRep <- 500
 params$M = 1 # number of composite variables
 params$holdout = 1000 # hold out sample size
