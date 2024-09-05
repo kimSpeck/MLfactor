@@ -38,6 +38,13 @@ setMIitems <- function(miItems.cond, J) {
   return(miItems)
 }
 
+# calculate the error variance of the item with MI violation
+getErrorVar <- function(loadingVec, varianceVec, targetVar) {
+  ###
+  #
+  targetVar - sum(loadingVec**2 * varianceVec)
+}
+
 calcRMSE = function(pred,obs){
   return(sqrt(mean((pred-obs)^2)))
 }
