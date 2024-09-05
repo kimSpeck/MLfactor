@@ -401,7 +401,7 @@ resRF <- lapply(seq_along(dataVec), function(iData) {
   items <- cbind(items, sex)
 
   # remove extra predictors for each iteration (depending on condition)
-  items[,dataVec[iData]] <- list(NULL) 
+  items[,dataVec[[iData]]] <- list(NULL) 
   
   TMP <- lapply(seq_along(criterionVec), function(iCrit) {
     
@@ -422,7 +422,7 @@ names(resRF) <- c("sex", "none")
 
 stopCluster(cl)
 
-save(resRF, file = "Dataset/randomForestResults_withInter.rda")
+save(resRF, file = "Dataset/randomForestResults_withCovar.rda")
 
 # to do: 
 # run random forests with sex as an additional predictor too; this is only without sex as an additional predictor
@@ -430,39 +430,38 @@ save(resRF, file = "Dataset/randomForestResults_withInter.rda")
 
 # # load data without covariate sex
 # load("Dataset/randomForestResults.rda")
+load("Dataset/randomForestResults_withCovar.rda")
 
 
-predResRF <- data.frame(rbind(cbind(resRF[["pFactor"]], rep("pFactor", times = 100)),
-                              cbind(resRF[["intern"]], rep("intern", times = 100)),
-                              cbind(resRF[["psych"]], rep("psych", times = 100)),
-                              cbind(resRF[["substance"]], rep("substance", times = 100))))
+# predResRF <- data.frame(rbind(cbind(resRF[["pFactor"]], rep("pFactor", times = 100)),
+#                               cbind(resRF[["intern"]], rep("intern", times = 100)),
+#                               cbind(resRF[["psych"]], rep("psych", times = 100)),
+#                               cbind(resRF[["substance"]], rep("substance", times = 100))))
 
-# pFactor <- rbindResults(resRF, "pFactor")
-# intern <- rbindResults(resRF, "intern")
-# psych <- rbindResults(resRF, "psych")
-# substance <- rbindResults(resRF, "substance")
-# 
-# predResRF <- rbind(pFactor, intern, psych, substance)
+pFactor <- rbindResults(resRF, "pFactor")
+intern <- rbindResults(resRF, "intern")
+psych <- rbindResults(resRF, "psych")
+substance <- rbindResults(resRF, "substance")
 
-# idxCondVec <- c("onlySex", "none")
-# idxCondVec <- condNames
-# 
-# predResRF$idxCond <- plyr::mapvalues(predResRF$idxCond, 
-#                                      from = unique(predResRF$idxCond), 
-#                                      to = idxCondVec)
+predResRF <- rbind(pFactor, intern, psych, substance)
 
-# colnames(predResRF) <- c("domains", "facets", "items", "idxCond", "measure")
+idxCondVec <- c("onlySex", "none")
 
-colnames(predResRF) <- c("domains", "facets", "items", "measure")
+predResRF$idxCond <- plyr::mapvalues(predResRF$idxCond,
+                                     from = unique(predResRF$idxCond),
+                                     to = idxCondVec)
+
+colnames(predResRF) <- c("domains", "facets", "items", "idxCond", "measure")
+
+# colnames(predResRF) <- c("domains", "facets", "items", "measure")
 
 col2num <- c("domains", "facets", "items")
 predResRF[col2num] <- lapply(predResRF[col2num], as.numeric)
 
-# col2fac <- c("idxCond", "measure")
-col2fac <- c("measure")
+col2fac <- c("idxCond", "measure")
 predResRF[col2fac] <- lapply(predResRF[col2fac], factor)
 
-plotRes <- aggregate(cbind(domains, facets, items) ~ measure, 
+plotRes <- aggregate(cbind(domains, facets, items) ~ idxCond + measure, 
                      data = predResRF, function(x) {cbind(mean(x), 
                                                           sd(x))})
 
@@ -471,7 +470,7 @@ colnames(plotRes) <- stringr::str_replace_all(colnames(plotRes), "\\.1", "_M")
 colnames(plotRes) <- stringr::str_replace_all(colnames(plotRes), "\\.2", "_SE")
 
 plotRes <- tidyr::pivot_longer(plotRes, 
-                               cols = !measure,
+                               cols = !c(idxCond, measure),
                                names_to = c("levels", "DV"), 
                                names_sep = "_",
                                values_to = "values")
@@ -480,10 +479,10 @@ plotRes <- tidyr::pivot_wider(plotRes,
                               names_from = DV, 
                               values_from = values)
 
-(ggplot(plotRes, 
+(pRF <- ggplot(plotRes, 
        aes(x = levels, y = M, 
-           group = measure,
-           colour = measure, linetype = measure)) +
+           group = interaction(measure, idxCond),
+           colour = measure, linetype = idxCond)) +
   geom_point(size = 2) +
   geom_line() +
   #scale_color_manual(values = colValVec) +
@@ -498,6 +497,12 @@ plotRes <- tidyr::pivot_wider(plotRes,
         axis.title.y = element_text(size = 20),
         strip.text.x = element_text(size = 15),
         strip.text.y = element_text(size = 15)))
+
+# ggplot2::ggsave(filename = paste0(plotFolder, "/randomForestResults.png"),
+#                 plot = pRF,
+#                 width = 7.22,
+#                 height = 5.51,
+#                 units = "in")
 
 # auch für Random Forest Regression verschwindet der Vorteil von Items nicht
 #   Item Vorteil im Vergleich zu Composites nicht durch komplexe Interaktionen etc. 
