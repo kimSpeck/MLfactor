@@ -344,6 +344,10 @@ simFit <- function(){
                        matrix(rep(rep(mSpecific, miItems),   # mi violation weights in mi violating items
                                   each = params$holdout/nGroups), ncol = miItems))
       
+      # to do: müsste das nicht umgekehrt sein? zuerst schwankende items, dann Gruppenitem?
+      # S = cbind(mvrnorm(N, rep(params$mS, J - miItems), 
+      #                   Sigma = Sigma_S[(miItems+1):J, (miItems+1):J]), 
+      #           SmiItems)
       S = cbind(SmiItems, mvrnorm(N, rep(params$mS, J - miItems), 
                                   Sigma = Sigma_S[(miItems+1):J, (miItems+1):J]))
       
