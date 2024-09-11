@@ -178,8 +178,48 @@ getErrorVar <- function(loadingVec, varianceVec, targetVar) {
 # varianceVec <- c(0.5, 0.25)
 # getErrorVar(loadingVec = c(miWeight, W[1]), 
 #             varianceVec = c(Sigma_T, Sigma_S[1, 1]),
-#             targetVar = itemVar)
+#             targetVar = itemVar)s
 
+defineTheta <- function(nVariables, sigmaE, cItemVar = T, 
+                        varNames = NULL, lambdaMat = NULL, covMat = NULL) {
+  ###
+  # define matrix of error variances
+  ## input:
+  # nVariables  - [scalar] number of manifest variables (with outcome)
+  # sigmaE      - [scalar] defined variance for the manifest variables
+  # cItemVar    - [boolean] should all manifest variables be simulated with the defined variance?
+  #                         (without outcome variable)
+  # varNames    - [vector] variable names of all manifest variables
+  # lambdaMat   - [matrix] matrix of factor loadings to calculate error variance
+  # covMat      - [matrix] matrix of factor variances to calculate error variance
+  ## output:
+  #             - [matrix] diagonal matrix of error variances for all manifest variables of the model
+  ###
+  
+  if (cItemVar) {
+    if (is.null(varNames) | is.null(lambdaMat) | is.null(covMat)) {
+      stop("You need to supply variable names, lambda and phi to calculate error variances.")
+    }
+    # calculate error variance depending on MI manipulation to keep variance of the item fixed at one
+    itemNameIdxVec <- grep("^X", varNames) # get all manifest variables from lambda
+    
+    # check if anything deviates from standard error variance measure for given item target variance
+    simValuesSigmaE <- sapply(itemNameIdxVec, function(iVar) {
+      iVarName <- varNames[iVar]  
+      facVec <- names(which(lambdaMat[iVarName,] != 0))
+      getErrorVar(loadingVec = lambdaMat[iVarName,facVec], 
+                  varianceVec = diag(covMat[facVec, facVec]),
+                  targetVar = params$dgp$itemTargetVar)
+    })
+    
+    # either use simValuesSigmaE directly; alternative strategy: check if anything deviates from constant error variance Sigma_e
+    diag(nVariables) * c(simValuesSigmaE, rep(0, params$dgp$nOutcome * params$dgp$nGroups)) 
+    
+  } else {
+    diag(nVariables) * c(rep(sigmaE, nVariables), rep(0, params$dgp$nOutcome * params$dgp$nGroups))   
+  }
+  
+}
 
 getSigma <- function(lambda, beta, phi, theta) {
   ###
@@ -231,3 +271,54 @@ getMeanYg2 <- function(rho, varGroup, varWithinY) {
 # getMeanYg2(0, params$dgp$varGroup, varWithinY)
 # getMeanYg2(0.2, params$dgp$varGroup, varWithinY)
 # getMeanYg2(0.5, params$dgp$varGroup, varWithinY)
+
+# this function needs to enable ...
+#     ... mean differences for scalar MI violations and 
+#     ... mean differences between groups in the outcome to simulate their correlation
+defineMeanVec <- function(J, scalarMIvio = F, miItems = 0, mSpecific = params$dgp$meanItem, 
+                          targetRho = 0, sigma = NULL) {
+  ###
+  # define mean vector for all manifest variables (including outcome in both groups)
+  #   -> needs to define mean differences in items between groups if scalar MI is violated
+  #   -> needs to define mean difference in outcome between groups if group and outcome is correlated
+  ## input:
+  # J           - [scalar] target correlation (by simulating different means for subgroups)
+  # scalarMIvio - [boolean] variance of the grouping variable (fixed at 0.25 due to balanced 
+  # miItems     - [scalar] within group variance of the outcome 
+  # mSpecific   - [scalar]
+  # targetRho   - [scalar]
+  # sigma       - [matrix]
+  ## output:
+  #             - [vector] mean of the second group in the outcome 
+  ###  
+  
+  # mean differences between groups in specific item effect (scalar MI violation?)
+  if (scalarMIvio) { # scalar MI violation
+    itemMeans <- c(rep(params$dgp$meanItem, J), # group 1 
+                   rep(c(params$dgp$meanItem, mSpecific), c(J-miItems, miItems))) # group 2 
+  } else { # scalar MI is given (identical item means across groups)
+    itemMeans <- rep(params$dgp$meanItem, J * params$dgp$nGroups)
+  }
+  
+  # simulate correlation between group and outcome
+  if (targetRho != 0) { # calculate mean to arrive at given correlation value
+    
+    # check if everything is provided to calculate mean for group 2 outcome
+    if (is.null(sigma)) {
+      stop("You need to provide sigma to calculate to calculate the mean of the 2nd group.")
+    }
+    
+    # extract outcome variance from sigma
+    Y1g1Idx <- which(colnames(sigma) == "Y1_g1")
+    Y1g2Idx <- which(colnames(sigma) == "Y1_g2")
+    
+    # we assume balance design with 2 groups! 
+    varWithinY <- 0.5 * sigma[Y1g1Idx, Y1g1Idx] + 0.5 * sigma[Y1g2Idx, Y1g2Idx]
+    meanYg2 <- getMeanYg2(targetRho, params$dgp$varGroup, varWithinY)
+    
+  } else { # group and outcome are not correlated
+    meanYg2 <- params$dgp$mY_g1 # same mean outcome value for both groups 
+  }
+  
+  c(itemMeans, rep(params$dgp$mY_g1, params$dgp$nOutcome), rep(meanYg2, params$dgp$nOutcome)) 
+}

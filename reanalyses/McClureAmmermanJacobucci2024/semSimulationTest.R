@@ -278,6 +278,8 @@ M <- c(rep(params$mS, J*nGroups), rep(0, params$nOutcome)) # without helper item
 
 # calculate model implied covariance matrix
 # for simulating from SEM
+# simulating one outcome in multiple group scenario (block matrices) increases the
+#   variance of the outcome in the model implied variance-covarince matrix from 1.125 to 1.25
 sigmaSEM <- lambdaSEM %*% solve(diag(nFactors) - betaMat) %*% covSEM %*%
   t(solve(diag(nFactors) - betaMat)) %*% t(lambdaSEM) + thetaSEM
 
@@ -475,6 +477,7 @@ betaMat[nFactors,] <- c(rep(c(betaT, beta_S), times = 2), 0)
 
 
 # error variance
+itemVar <- 1
 adjustedError <- getErrorVar(loadingVec = c(miWeight, W[1]),
                              varianceVec = c(Sigma_T, Sigma_S[1, 1]),
                              targetVar = itemVar)
@@ -706,20 +709,16 @@ getErrorVar(loadingVec = lambdaSEM["X9_g2",facVec],
 thetaSEM <- diag(c(rep(diag(Sigma_e), nGroups), rep(0, params$nOutcome), rep(0, params$nOutcome))) 
 thetaSEM
 
-# here!
-# implement measurement invariance violation conditions
-defineTheta <- function(nVariables, nItems, sigmaE, MI = T) {
-  theta <- diag(nVariables) * c(rep(sigmaE, nItems*params$dgp$nGroups),
-                                rep(0, params$dgp$nOutcome * params$dgp$nGroups))
-  
-}
 
 # calculate model implied covariance matrix
 # for simulating from SEM
+# when simulating two outcomes instead of one from the block matrix, the outcome
+#   for each block has the same variance as for one group (var(Y1) = var(Y2) = 1.125)
 sigmaSEM <- getSigma(lambdaSEM, betaMat, covSEM, thetaSEM)
 
 # sigmaSEM <- lambdaSEM %*% solve(diag(nFactors) - betaMat) %*% covSEM %*%
 #   t(solve(diag(nFactors) - betaMat)) %*% t(lambdaSEM) + thetaSEM
+
 
 # set mean values for manifest variables
 # check this: mean of the outcome (y) is zero now... this might be different in the Jacobucci simulation?
@@ -737,7 +736,9 @@ M
 # this function needs to enable ...
 #     ... mean differences for scalar MI violations and 
 #     ... mean differences between groups in the outcome to simulate their correlation
-defineMeanVec <- function(scalarMI = F) {}
+defineMeanVec <- function(scalarMI = F) {
+  
+}
 
 # simulate date from multivariate normal distribution
 # if we have this block matrix structure we only need N/nGroups observations
@@ -825,7 +826,7 @@ fit_singleGroup <- lavaan::sem(m0, data = data)
 fit_singleGroup@Model@GLIST
 
 
-##### simulate from multiple group SEM with group--outcome correlation and configural MI violation
+##### simulate from multiple group SEM with group--outcome correlation and configural MI violation #####
 nGroups <- 2
 miItems <- 1
 miWeight <- list(c(0))
@@ -856,7 +857,7 @@ betaMat <- matrix(rep(0,
                   ncol = nFactors, byrow = T)
 betaMat[nFactors,] <- c(rep(c(betaT, beta_S), times = 2), 0)
 
-##### simulate from multiple group SEM with group--outcome correlation and metric MI violation
+##### simulate from multiple group SEM with group--outcome correlation and metric MI violation #####
 nGroups <- 2
 miItems <- 1
 miWeight <- list(c(-0.8))
@@ -866,7 +867,7 @@ nFactors <- ncol(lambdaSEM)
 
 covSEM <- definePhi(nFactors, Sigma_T, Sigma_S[1, 1], J)
 
-##### simulate from multiple group SEM with group--outcome correlation and scalar MI violation
+##### simulate from multiple group SEM with group--outcome correlation and scalar MI violation #####
 
 covSEM <- definePhi(nFactors, Sigma_T, Sigma_S[1, 1], J, scalarMI = T, miItems = 1)
 
