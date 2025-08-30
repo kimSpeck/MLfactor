@@ -325,4 +325,12 @@ params$fit$alpha <- seq(0, 1, length.out = 20) # alpha with at least 20 steps
 # "lambda.1se" = the largest lambda at which the MSE is within one SE of the smallest MSE (default).
 # here: "one-standard-error" rule for choosing lambda (Hastie et al. 2009)
 #   Friedman et al. 2010. Regularization Paths for Generalized Linear Models via Coordinate Descent.
-params$fit$lambdaCrit <- "1se" # 1se
+params$fit$caretCrit <- "oneSE" # 1se
+
+# partial regularization with ENET (use penalty only on items)
+# - penalty.factor is a numeric vector of length p (number of columns in X, excluding the intercept).
+# - Default is 1 for all features.
+# - Set penalty.factor[j] = 0 to leave feature j unpenalized (it’s estimated but not shrunk).
+# - The intercept is never penalized (when intercept=TRUE).
+params$fit$defaultPenalty <- 1
+params$fit$noPenalty <- 0
