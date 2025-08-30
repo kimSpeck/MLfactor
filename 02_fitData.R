@@ -85,7 +85,8 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
     estN <- lapply(seq_along(params$dgp$trainN), function(iN) { 
       
       # random sampling from training sample (reproducible?)
-      sampleIdx <- sample(seq_len(max(params$dgp$trainN)), size = params$dgp$trainN[iN], replace = FALSE)
+      sampleIdx <- sample(seq_len(max(params$dgp$trainN)), size = params$dgp$trainN[iN], 
+                          replace = FALSE)
       dataSubset <- data[sampleIdx, ]
       
       # # checks
@@ -96,7 +97,8 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
       # set foldid 
       # ... for every N separately
       # ... but identical foldids for every model within the same condition
-      foldid <- sample(rep(seq_len(params$fit$nfolds), length.out =  params$dgp$trainN[iN]), replace = FALSE)
+      foldid <- sample(rep(seq_len(params$fit$nfolds), length.out =  params$dgp$trainN[iN]), 
+                       replace = FALSE)
       
       # run fit functions with different settings 
       # ... fit data on training sample
@@ -104,18 +106,27 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
       # ... test fit model on holdout data within fit function
       
       # linear regression 
-      fit_LM <- fitOLS(trainData = dataSubset, testData = ?, foldid = foldid) 
+      fit_LM <- fitOLS(trainData = dataSubset, 
+                       #here: change the testData object to actual testData
+                       testData = data[which(!(seq_len(dim(data)[1]) %in% sampleIdx)),],  
+                       foldid = foldid) 
       
       # ridge regression
-      fit_Ridge <- fitRegReg(trainData = dataSubset, testData = ?, 
+      fit_Ridge <- fitRegReg(trainData = dataSubset,
+                             #here: change the testData object to actual testData
+                             testData = data[which(!(seq_len(dim(data)[1]) %in% sampleIdx)),],  
                              foldid = foldid, regMode = "ridge") 
       
       # elastic net regression
-      fit_ENET <- fitRegReg(trainData = dataSubset, testData = ?, 
+      fit_ENET <- fitRegReg(trainData = dataSubset, 
+                            #here: change the testData object to actual testData
+                            testData = data[which(!(seq_len(dim(data)[1]) %in% sampleIdx)),],  
                             foldid = foldid, regMode = "enet") 
       
       # elastic net regression only item penalty
-      fit_ENETitems <- fitRegReg(trainData = dataSubset, testData = ?, 
+      fit_ENETitems <- fitRegReg(trainData = dataSubset, 
+                                 #here: change the testData object to actual testData
+                                 testData = data[which(!(seq_len(dim(data)[1]) %in% sampleIdx)),],  
                                  foldid = foldid, regMode = "itemENET") 
       
     })
