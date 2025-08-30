@@ -3,7 +3,8 @@
 
 fitOLS <- function(trainData, testData, foldid) {
   
-  # # check it
+  # # test it
+  # trainData <- dataSubset
   # testData <- data[which(!(seq_len(dim(data)[1]) %in% sampleIdx)),]
   
   # checks
@@ -11,10 +12,17 @@ fitOLS <- function(trainData, testData, foldid) {
     stop("Fold-ID vector and data have not the same length!")
   }
   
+  if (Q > 1) {
+    stop("Result object is not implemented for multiple factors.")
+  }
+  
   # fit only items, only scores, fit items + scores
   # ... implement this by different vectors of variable names
   itemNames <- paste0("X", seq_len(P))
   trainPredSets <- list(itemNames, "score", c(itemNames, "score"))
+  
+  # # test it 
+  # iPredSet <- trainPredSets[[1]]
   
   # iterate over vectors of variable names to fit items, scores and both combined
   predSetRes <- lapply(trainPredSets, function(iPredSet) {
@@ -60,6 +68,9 @@ fitOLS <- function(trainData, testData, foldid) {
     performCVtest <- matrix(colMeans(performPerFold[, c("RMSE", "Rsquared", "MAE")]), ncol = 3, nrow = 1)
     
     # fit regression on full training data (no tuning parameters, thus new model)
+    # attention: one predictor column is an exact linear combination of others (or is all zeros). 
+    # In that case the corresponding regression coefficient is not identifiable, so 
+    # lm drops it and reports it as NA with the message “(1 not defined because of singularities)
     fit <- lm(lm_modelSyntax, data = trainData)
     
     # get Root Mean Squared Error (RMSE), explained variance (R2), and Mean Absolute Error (MAE) for model training
@@ -80,7 +91,26 @@ fitOLS <- function(trainData, testData, foldid) {
     predBias <- NA_real_
     predVar <- NA_real_
     
+    # build results object which saves all coefficients and standard errors of the estimated coefficients
+    #   -> this should have identical dimensions across ...
+    #       ... all simulated conditions (P = {4, 8}) 
+    #       ... and all datasets/feature sets used for fitting the model
+    coefMat <- matrix(rep(NA_real_, (1 + max(params$dgp$P) + max(params$dgp$Q)) * 2), nrow = 2)
+    colnames(coefMat) <- c("(Intercept)", 
+                           paste0("X", seq_len(max(params$dgp$P))), 
+                           rep("score", max(params$dgp$Q)))
     
+    # fill in regression coefficients
+    # due to perfect collinearity of some predictor variables, regression coefficient 
+    #   might become NA in some simulated conditions; therefore check is.na()
+    nameIDX <- match(names(coef(fit)), colnames(coefMat))
+    keep <- !is.na(nameIDX)
+    coefMat[1, nameIDX[keep]] <- coef(fit)[keep]
+    
+    # fill in SE of the regression coefficient estimates
+    vcovFit   <- tryCatch(vcov(fit), error = function(e) NULL)
+    seFit   <- if (!is.null(vcovFit)) sqrt(diag(vcovFit)) else rep(NA_real_, length(coef(fit)))
+    if (length(seFit) == length(coef(fit))) coefMat[2, nameIDX[keep]] <- seFit[keep]
     
     # object with results to return to predSetRes 
     list(
@@ -89,15 +119,23 @@ fitOLS <- function(trainData, testData, foldid) {
       # prediction bias and prediction variance 
       predError = matrix(c(predBias, predVar), ncol = 2, nrow = 1),
       # predictor choice by extracting regression coefficients (for all possible coefficients)
-      # here: due to perfect collinearity of some predictor variables, regression coefficient 
-      #   might become NA in some simulated conditions
-      regCoef = coef(fit) # regression coefficients
-      summary(fit)$coefficients # SE?
-      )
+      # matrix with regression coefficients in row 1 and SEs in row 2 
+      regCoef = coefMat)
   })
   
-  # object with results to return to fitData Script 
-  # name columns of performance Matrix
-  colNames <- c(unite(expand.grid(c("RMSE", "Rsquared", "MAE"), c("CVtest", "train", "HOtest")), "names"))[["names"]]
+  # build results object to return
+  resOLS <- vector(mode = "list", 3)
+  names(resOLS) <- c("performVec", "predError", "regCoef")
   
+  # object with results to return to fitData Script 
+  resOLS[["performVec"]] <- do.call(rbind, lapply(predSetRes, `[[`, "performVec"))
+  # name columns of performance Matrix
+  colnames(resOLS[["performVec"]]) <- c(unite(expand.grid(c("RMSE", "Rsquared", "MAE"), 
+                                                        c("CVtest", "train", "HOtest")), 
+                                            "names"))[["names"]]
+  
+  resOLS[["predError"]] <- do.call(rbind, lapply(predSetRes, `[[`, "predError"))
+  resOLS[["regCoef"]] <- do.call(rbind, lapply(predSetRes, `[[`, "regCoef"))
+  
+  return(resOLS)
 }
