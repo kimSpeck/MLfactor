@@ -23,8 +23,8 @@ sampleData <- function() {
     }
     
     # simulate data + save parameter checks
-    checkFlag <- T 
-    if (checkFlag) {N <- 20000}
+    checkFlag <- FALSE 
+    # if (checkFlag) {N <- 20000}
     
     # simulate date from multivariate normal distribution
     # if we have this block matrix structure we only need N/nGroups observations

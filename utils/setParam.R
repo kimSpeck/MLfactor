@@ -91,7 +91,8 @@ getBy <- function(R2, sigmaEy, varT, cAlpha, nFactors = 1) {
 ################################################################################
 # simulation design 
 ################################################################################
-params$sim$nTrain <- 1000 # number of training samples
+# params$sim$nTrain <- 1000 # number of training samples
+params$sim$nTrain <- 100 # number of training samples
 params$sim$nTest <- 1 # number of holdout test samples to evaluate models on 
 params$sim$nSamples <- params$sim$nTrain + params$sim$nTest
 
@@ -165,13 +166,6 @@ params$dgp$cAlpha <- c(0.6, 0.8)
 # ... maybe add resdiual or stick to the technical argument (see Millsap, 1997)
 # ... tested configural MI violations (flT = 0) in piloting and coding but not as interesting(?)
 params$dgp$MIvio <- c("specific", "scalar", "metric") 
-
-# # MI weight does not exist anymore since MI weights are controlled by beta0 and beta1
-# configural MI by using 0 as a weight
-# metric MI by using -0.8 as a weight
-# scalar MI by using unit weight (= identical weights) but instead change mean of specific item effect
-# params$dgp$miWeight = c(0, -0.8, 1) # weight of measurement variant items
-
 
 # manipulation measurement invariance violations
 params$dgp$nGroups = 2  # number of groups (MI due to categorical variable)
@@ -257,6 +251,10 @@ params$dgp$grid$b1 <- sapply(seq_len(dim(params$dgp$grid)[1]), function(iRow) {
   }
 })
 
+# calculate regression coefficients of the true factor(s) accordingly
+#   the specific item variance adds to the fixed R² (based on the grid)
+# presumably, betaT changes depending on the variance in the true factor and Cronbach's Alpha
+#   and hence, the reliability of the predictor
 params$dgp$grid$betaT <- sapply(seq_len(dim(params$dgp$grid)[1]), function(iRow) {
   return(getBy(R2 = params$dgp$grid$R2[iRow], sigmaEy = params$dgp$sigmaEy,
                varT = params$dgp$grid$varT[iRow], cAlpha = params$dgp$grid$cAlpha[iRow]))
@@ -288,13 +286,6 @@ params$dgp$grid[which(params$dgp$grid$miItems == 0 &
 # idxRmConds <- which(params$dgp$grid$MIvio == "none" & params$dgp$grid$miItems > 1)
 # params$dgp$grid <- params$dgp$grid[-idxRmConds, ]
 
-# calculate regression coefficients of the true factor(s) accordingly
-#   the specific item variance adds to the fixed R² (based on the grid)
-# presumably, betaT changes depending on the variance in the true factor and Cronbach's Alpha
-#   and hence, the reliability of the predictor
-# here: Herleitung der Regressionsgewichte für den true factor! 
-params$dgp$betaT <- 0.5 
-
 # specicic item effects do not have an effect in every MIvio manipulation except specific!
 params$dgp$betaS <- 1
 params$dgp$grid$betaS <- ifelse(params$dgp$grid$MIvio != "specific", 0, params$dgp$betaS)
@@ -303,6 +294,12 @@ params$dgp$grid$betaS <- ifelse(params$dgp$grid$MIvio != "specific", 0, params$d
 #   if the true DGP has only one group
 # params$dgp$varFLgrid$nGroups <- ifelse(params$dgp$varFLgrid$MIvio == "specific", 1, params$dgp$nGroups)
 
+# create seed number for parallel cluster (reproducibility of generated data)
+#   keep seeds from simulating only linear effects and only add nonlinear conditions with seed
+#   -> two step grid generating
+set.seed(8967369)
+seedNum <- sample(1:999999999, dim(params$dgp$grid)[1], replace = FALSE) 
+params$dgp$grid$sampleSeed <- seedNum[1:dim(params$dgp$grid)[1]]
 ################################################################################
 # model fitting
 ################################################################################
@@ -317,7 +314,7 @@ params$fit$lambda <- 10^seq(-1, 1, length = 100)
 #         -> thus, lots of users use warm start for lambda tuning
 #       with warmStart exact model is chosen more frequently
 #  con: less control over lambda grid to be searched      
-params$fit$warmStart <- TRUE  # thus, lambda parameter are not used
+# params$fit$warmStart <- TRUE  # thus, lambda parameter are not used
 params$fit$alpha <- seq(0, 1, length.out = 20) # alpha with at least 20 steps
 
 # the code can handle setParam$fit$lambdaCrit = {"1se", "min"} or every subset

@@ -24,7 +24,7 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
   
   # fit only items, only scores, fit items + scores
   # ... implement this by different vectors of variable names
-  itemNames <- paste0("X", seq_len(P))
+  itemNames <- paste0("X", seq_len(grid$P[iSim]))
   
   # fit every combination of predictors for regMode = {ridge, enet}
   if (regMode != "itemENET") { 
@@ -45,7 +45,7 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
     #   Unpenalized features are still estimated jointly, so their coefficients can 
     #   change with lambda because the penalized part of the model changes; they’re just not directly shrunk.
     penaltyFactor <- c(rep(params$fit$defaultPenalty, length(itemNames)), 
-                       rep(params$fit$noPenalty, Q))
+                       rep(params$fit$noPenalty,  grid$Q[iSim]))
     names(penaltyFactor) <- c(itemNames, "score")
   }
   
@@ -173,7 +173,8 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
       # matrix with regression coefficients in row 1 and (no) SEs in row 2 
       regCoef = coefMat,
       # save hyperparameter values to check if cross validation chose ridge 
-      hyperParams = matrix(c(alpha = fit$bestTune$alpha, lambda = fit$bestTune$lambda), ncol = 2, nrow = 1)) 
+      hyperParams = matrix(c(alpha = fit$bestTune$alpha, lambda = fit$bestTune$lambda), 
+                           ncol = 2, nrow = 1)) 
 
   })
   

@@ -60,44 +60,37 @@ grid <- params$dgp$grid
 # ! factors are interpreted as level numbers!; only character variables are interpreted by their name!
 str(grid) 
 
-# create seed number for parallel cluster (reproducibility of generated data)
-#   keep seeds from simulating only linear effects and only add nonlinear conditions with seed
-#   -> two step grid generating
-set.seed(8967369)
-seedNum <- sample(1:999999, dim(grid)[1], replace = FALSE) 
-grid$sampleSeed <- seedNum[1:dim(grid)[1]]
-
-# sanity checks for data
-params$sim$nSamples <- 1
+# # sanity checks for data
+# params$sim$nSamples <- 1
 
 ##### test it #####
-# test simulation condition that crushes SEM estimation
-condVec <- which(params$dgp$grid$P == 4 &
-                   params$dgp$grid$cAlpha == 0.6 &
-                   params$dgp$grid$miItems == 1 &
-                   params$dgp$grid$corGO == 0 &
-                   params$dgp$grid$R2 == 0.8 &
-                   params$dgp$grid$varT == 0.25 &
-                   params$dgp$grid$MIvio == "metric")
-iCond <- condVec[1]
-P <- params$dgp$grid$P[iCond]
-Q <- params$dgp$grid$Q[iCond]
-cAlpha <- params$dgp$grid$cAlpha[iCond]
-varT <- params$dgp$grid$varT[iCond]
-miItems <- params$dgp$grid$miItems[iCond]
-corGO <- params$dgp$grid$corGO[iCond]
-R2 <- params$dgp$grid$R2[iCond]
-varStable <- params$dgp$grid$varStable[iCond]
-flT <- params$dgp$grid$flT[iCond]
-flS <- params$dgp$grid$flS[iCond]
-varE <- params$dgp$grid$varE[iCond]
-MIvio <- params$dgp$grid$MIvio[iCond]
-b0 <- params$dgp$grid$b0[iCond]
-b1 <- params$dgp$grid$b1[iCond]
-betaT <- params$dgp$grid$betaT[iCond]
-varS <- params$dgp$grid$varS[iCond]
-betaS <- params$dgp$grid$betaS[iCond]
-sampleSeed <- grid$sampleSeed[iCond]
+# # test simulation condition that crushes SEM estimation
+# condVec <- which(params$dgp$grid$P == 4 &
+#                    params$dgp$grid$cAlpha == 0.6 &
+#                    params$dgp$grid$miItems == 1 &
+#                    params$dgp$grid$corGO == 0 &
+#                    params$dgp$grid$R2 == 0.8 &
+#                    params$dgp$grid$varT == 0.25 &
+#                    params$dgp$grid$MIvio == "metric")
+# iCond <- condVec[1]
+# P <- params$dgp$grid$P[iCond]
+# Q <- params$dgp$grid$Q[iCond]
+# cAlpha <- params$dgp$grid$cAlpha[iCond]
+# varT <- params$dgp$grid$varT[iCond]
+# miItems <- params$dgp$grid$miItems[iCond]
+# corGO <- params$dgp$grid$corGO[iCond]
+# R2 <- params$dgp$grid$R2[iCond]
+# varStable <- params$dgp$grid$varStable[iCond]
+# flT <- params$dgp$grid$flT[iCond]
+# flS <- params$dgp$grid$flS[iCond]
+# varE <- params$dgp$grid$varE[iCond]
+# MIvio <- params$dgp$grid$MIvio[iCond]
+# b0 <- params$dgp$grid$b0[iCond]
+# b1 <- params$dgp$grid$b1[iCond]
+# betaT <- params$dgp$grid$betaT[iCond]
+# varS <- params$dgp$grid$varS[iCond]
+# betaS <- params$dgp$grid$betaS[iCond]
+# sampleSeed <- grid$sampleSeed[iCond]
 
 #####
 options(warn = -1)
@@ -106,7 +99,7 @@ options(warn = -1)
 createData <- function(P, Q, cAlpha, varT, miItems, corGO, R2, varStable, flT, flS,
                        varE, MIvio, b0, b1, betaT, varS, betaS, sampleSeed){
   
-  checkFlag <- T
+  checkFlag <- FALSE
   ##### measurement model #####
   # ... always simulate nGroups = 2 in every condition but keep parameters identical! 
   
@@ -184,6 +177,7 @@ createData <- function(P, Q, cAlpha, varT, miItems, corGO, R2, varStable, flT, f
   stopCluster(cl)
 }
 
+# actually sample data (or save checks - checkFlag = T)
+out <- do.call(mapply, c(FUN = createData, grid))
+
 options(warn = 0)
-# # actually sample data (or save checks - checkFlag = T)
-# out <- do.call(mapply, c(FUN = createData, grid))
