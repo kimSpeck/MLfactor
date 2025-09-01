@@ -41,7 +41,7 @@ grid <- params$dgp$grid
 #   ... prediction based on items and based on composite
 #   ... prediction based on predictor set with group, without group, with group predicted from items
 
-params$sim$nTrain <- 30
+params$sim$nTrain <- 100
 
 results <- lapply(seq_len(nrow(grid)), function(iSim) {
   
@@ -59,7 +59,6 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
   conditionFolder <- paste0("simData_MIvio", grid$MIvio[iSim], "_miItems", grid$miItems[iSim], 
                      "_P", grid$P[iSim], "_Q", grid$Q[iSim], "_cAlpha", grid$cAlpha[iSim], 
                      "_varT", grid$varT[iSim], "_corGO", grid$corGO[iSim], "_R2", grid$R2[iSim])
-  
   
   tStart <- Sys.time() # time monitoring
   
