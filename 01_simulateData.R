@@ -73,9 +73,11 @@ params$sim$nSamples <- 1
 ##### test it #####
 # test simulation condition that crushes SEM estimation
 condVec <- which(params$dgp$grid$P == 4 &
-                   params$dgp$grid$cAlpha == 0.8 &
-                   params$dgp$grid$miItems == 0 &
+                   params$dgp$grid$cAlpha == 0.6 &
+                   params$dgp$grid$miItems == 1 &
                    params$dgp$grid$corGO == 0 &
+                   params$dgp$grid$R2 == 0.8 &
+                   params$dgp$grid$varT == 0.25 &
                    params$dgp$grid$MIvio == "metric")
 iCond <- condVec[1]
 P <- params$dgp$grid$P[iCond]

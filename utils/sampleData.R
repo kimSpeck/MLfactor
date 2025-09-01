@@ -53,16 +53,16 @@ sampleData <- function() {
     data$avg <- data$score/length(itemNames)
     
     
-    # what to save form data simulation?
-    # ... what do I need to fit the models on the data?
-    # ... what do I need to compute outcome measures?
-    # save ...
-    #     ... data 
-    #     ... 
-    #     ... any checks?
-    if (!checkFlag) {
-      dataList <- list()   
-    }
+    # # here: what to save form data simulation?
+    # # ... what do I need to fit the models on the data?
+    # # ... what do I need to compute outcome measures?
+    # # save ... 
+    # #     ... data 
+    # #     ... any variables for prrediction bias or prediction variance estimation?
+    # #     ... any checks?
+    # if (!checkFlag) {
+    #   dataList <- list()  
+    # }
     
     
     # here: maybe save checkList parameters differently?
@@ -192,7 +192,7 @@ sampleData <- function() {
     if (!checkFlag){
       sampleNames <- c(seq_len(params$sim$nTrain), paste0("test", seq_len(params$sim$nTest)))
       fileName <- paste0("sample_", sampleNames[iSample], ".rda")
-      save(dataList, file = paste0(dataFolder, conditionFolder, "/", fileName))
+      save(data, file = paste0(dataFolder, conditionFolder, "/", fileName))
     } else {
       checkList
     }

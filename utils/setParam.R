@@ -109,7 +109,7 @@ params$sim$testN <- 1000            # fixed test sample size across all N condit
 # sample size 
 #   - McClure et al. c(50, 100, 250, 500, 1000)
 #   - Pratiwi et al. c(100, 300, 500)
-params$dgp$trainN <- c(50, 100, 250, 500, 1000) # sample size
+params$dgp$trainN <- c(100, 300, 1000) # sample size
 
 # number of items per component/score/factor
 #   - McClure et al. c(9, 21): eher heterogene Items in clinical scales
@@ -325,7 +325,7 @@ params$fit$alpha <- seq(0, 1, length.out = 20) # alpha with at least 20 steps
 # "lambda.1se" = the largest lambda at which the MSE is within one SE of the smallest MSE (default).
 # here: "one-standard-error" rule for choosing lambda (Hastie et al. 2009)
 #   Friedman et al. 2010. Regularization Paths for Generalized Linear Models via Coordinate Descent.
-params$fit$caretCrit <- "oneSE" # 1se
+params$fit$caretCrit <- "best" # not 1se
 
 # partial regularization with ENET (use penalty only on items)
 # - penalty.factor is a numeric vector of length p (number of columns in X, excluding the intercept).

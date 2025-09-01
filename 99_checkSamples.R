@@ -218,7 +218,7 @@ sampleStats$MIvio <- factor(sampleStats$MIvio,
                             levels = c("specific", "metric", "scalar"))
 
 ggplot(sampleStats[sampleStats$cAlpha == 0.6 &
-                     sampleStats$varT == 0.5, ], 
+                     sampleStats$varT == 0.25, ], 
        aes(x = MIvio, y = R2_diff, group = interaction(miItemsPlot, P), 
            color = miItemsPlot, fill = miItemsPlot,
            linetype = P)) +

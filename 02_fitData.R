@@ -37,7 +37,6 @@ grid <- params$dgp$grid
 
 # only load biggest dataset! draw random subsamples and fit smaller subsets
 # this is done to avoid excessive memory requirements to save the data!
-# N = {50, 100, 250, 500, 1000}
 
 # prediction based on linear regression and based on elastic net regression
 #   ... prediction based on items and based on composite
@@ -73,6 +72,7 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
                    "; first Sample at ", format(Sys.time(), "%d%m%y_%H%M%S")))  
     }
     
+    # here: load actually simulated data! object names?!
     # load training and holdout test data for single sample rda files
     # load training sample
     load(paste0(dataFolder, "/", conditionFolder, "/sample_", iSample, ".rda"))
@@ -82,6 +82,7 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
     load(paste0(dataFolder, "/", conditionFolder, "/sample_test1.rda"))
     
     # lapply over different conditions of sample sizes
+    # test it!
     estN <- lapply(seq_along(params$dgp$trainN), function(iN) { 
       
       # random sampling from training sample (reproducible?)
@@ -93,7 +94,6 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
       # length(sampleIdx)
       # length(unique(sampleIdx))
       
-      
       # set foldid 
       # ... for every N separately
       # ... but identical foldids for every model within the same condition
@@ -104,39 +104,80 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
       # ... fit data on training sample
       # ... fit different datasets within every fit function {onlyItems, onlyScores, Items + Score}
       # ... test fit model on holdout data within fit function
+      modelList <- vector(mode = "list", length = 4)
+      names(modelList) <- c("fit_LM", "fit_Ridge", "fit_ENET", "fit_ENETitems")
       
       # linear regression 
-      fit_LM <- fitOLS(trainData = dataSubset, 
+      modelList[["fit_LM"]] <- fitOLS(trainData = dataSubset, 
                        #here: change the testData object to actual testData
                        testData = data[which(!(seq_len(dim(data)[1]) %in% sampleIdx)),],  
                        foldid = foldid) 
       
       # ridge regression
-      fit_Ridge <- fitRegReg(trainData = dataSubset,
+      modelList[["fit_Ridge"]] <- fitRegReg(trainData = dataSubset,
                              #here: change the testData object to actual testData
                              testData = data[which(!(seq_len(dim(data)[1]) %in% sampleIdx)),],  
                              foldid = foldid, regMode = "ridge") 
       
       # elastic net regression
-      fit_ENET <- fitRegReg(trainData = dataSubset, 
+      modelList[["fit_ENET"]] <- fitRegReg(trainData = dataSubset, 
                             #here: change the testData object to actual testData
                             testData = data[which(!(seq_len(dim(data)[1]) %in% sampleIdx)),],  
                             foldid = foldid, regMode = "enet") 
       
       # elastic net regression only item penalty
-      fit_ENETitems <- fitRegReg(trainData = dataSubset, 
+      modelList[["fit_ENETitems"]] <- fitRegReg(trainData = dataSubset, 
                                  #here: change the testData object to actual testData
                                  testData = data[which(!(seq_len(dim(data)[1]) %in% sampleIdx)),],  
                                  foldid = foldid, regMode = "itemENET") 
       
+      list(performVec = cbind(sample = iSample, N = rep(params$dgp$trainN[iN]), 
+            model = rep(c("LM", "Ridge", "ENET", "itemENET"), c(3, 2, 2, 1)),
+            predSet = rep(c("items", "score", "comb", "items", "comb", "items", "comb", "comb")),
+            do.call(rbind, lapply(modelList, `[[`, "performVec"))),
+           # predError = do.call(rbind, lapply(modelList, `[[`, "predError")),
+           regCoef = cbind(sample = iSample, N = rep(params$dgp$trainN[iN]), 
+            model = rep(c("LM", "Ridge", "ENET", "itemENET"), c(3, 2, 2, 1)),
+            predSet = rep(c("items", "score", "comb", "items", "comb", "items", "comb", "comb")),
+            do.call(rbind, lapply(modelList, `[[`, "regCoef"))),
+           hyperParams = cbind(sample = iSample, N = rep(params$dgp$trainN[iN]), 
+            model = rep(c("Ridge", "ENET", "itemENET"), c(2, 2, 1)),
+            predSet = c("items", "comb", "items", "comb", "comb"),
+            do.call(rbind, lapply(modelList, `[[`, "hyperParams"))))
+      
     })
     
-    # combine results for every subsampled N 
+    # here: combine results for every subsampled N 
+    # save condition information!
+    # save sample number! 
+    resAllN <- vector(mode = "list", 3)
+    names(resAllN) <- c("performVec", "regCoef", "hyperParams")
     
+    resAllN[["performVec"]] <- do.call(rbind, lapply(estN, `[[`, "performVec"))
+    # do.call(rbind, lapply(estN, `[[`, "predError"))
+    resAllN[["regCoef"]] <- do.call(rbind, lapply(estN, `[[`, "regCoef"))
+    resAllN[["hyperParams"]] <- do.call(rbind, lapply(estN, `[[`, "hyperParams"))
+    
+    resAllN # this list with performVec for all models and all Ns is saved for every sample 
     
   }) # end of parallel fitting for samples
+  
   tEnd <- Sys.time() # time monitoring
   difftime(tEnd, tStart)
+  
+  # close cluster to return resources (memory) back to OS
+  stopCluster(cl)
+  
+  # manage data
+  # save separate each simulated condition in rds files  
+  #   -> pro: skip fitted condGrid conditions if algorithm does not run till the end...
+  resFileName <- paste0(resFolder, "/", "resFile_MIvio", grid$MIvio[iSim], 
+                        "_miItems", grid$miItems[iSim], "_P", grid$P[iSim], 
+                        "_Q", grid$Q[iSim], "_cAlpha", grid$cAlpha[iSim], 
+                        "_varT", grid$varT[iSim], "_corGO", grid$corGO[iSim], 
+                        "_R2", grid$R2[iSim], ".rds")
+  saveRDS(estRes, file = resFileName)
+  
 })
 
 ######

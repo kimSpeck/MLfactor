@@ -28,7 +28,10 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
   
   # fit every combination of predictors for regMode = {ridge, enet}
   if (regMode != "itemENET") { 
-    trainPredSets <- list(itemNames, "score", c(itemNames, "score"))  
+    # one predictor model does not work with glmnet
+    #     for one predictor, shrinkage 
+    #     glmnet: "Error: x should be a matrix with 2 or more columns"
+    trainPredSets <- list(itemNames, c(itemNames, "score"))  
     
     # create penaltyFactor vector for these conditions (with only defaultValue)
     #   inside the lapply()-function that iterates over predictor sets instead of 
@@ -88,11 +91,14 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
     # here: automatically supply model syntax! How do I need to write the model syntax for caret?
     fit <- caret::train(as.formula(modelSyntax),
                         trainData,
-                        method = if (length(iPredSet) == 1) {"lm"} else {"glmnet"}, # elastic net regression
+                        method = "glmnet", # elastic net regression
                         penalty.factor = penaltyFactor, # penalty factor
                         metric = "RMSE",
-                        # no pre-processing; if i would use preProcess = c("center","scale") 
-                        #   caret would return standardized coefficients
+                        # standardize and center due to different scale the score lives on!
+                        #   otherwise regularization would affect items and score differently 
+                        # standardization is only applied to predictors; not to the outcome! 
+                        #   thus, we do not get standardized coefficienst automatically!
+                        preProcess = c("center", "scale"), 
                         #model training using ten-fold cross-validation
                         trControl = trainControl(method = "cv", 
                                                  number = params$fit$nfolds,
@@ -102,7 +108,7 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
                                                  # oneSE rule
                                                  selectionFunction = params$fit$caretCrit,
                                                  search = "grid"), 
-                        tuneGrid =if (length(iPredSet) == 1) {NULL} else {tmpTuneGrid}, #setting the tuning grid
+                        tuneGrid = tmpTuneGrid, #setting the tuning grid
                         verbose = FALSE)
     
     # R² across all test sets in the CV procedure (for the final hyperparameters)
@@ -111,13 +117,22 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
     performCVtest <- matrix(unlist(fit$results[rownames(fit$results) == rownames(fit$bestTune), 
                                        c("RMSE", "Rsquared", "MAE")]), , ncol = 3, nrow = 1)
     
+    # standardize and center full training and full test for refitting model on 
+    #     full data and test performance!
+    fullTrain <- cbind(trainData[,"Y"], 
+                       apply(trainData[, which(colnames(trainData) %in% iPredSet)], 
+                             2, scale, center = T, scale = T))
+    fullTest <- cbind(testData[,"Y"], 
+                      apply(testData[, which(colnames(testData) %in% iPredSet)], 
+                            2, scale, center = T, scale = T)) 
+    
     # get Root Mean Squared Error (RMSE), explained variance (R2), and Mean Absolute Error (MAE) for model training
-    predTrain <- predict(fit, trainData)
-    performTrain <- matrix(evalPerformance(predTrain, trainData$Y), ncol = 3, nrow = 1)
+    predTrain <- predict(fit, fullTrain)
+    performTrain <- matrix(evalPerformance(predTrain, fullTrain$Y), ncol = 3, nrow = 1)
     
     # get Root Mean Squared Error (RMSE), explained variance (R2), and Mean Absolute Error (MAE) for model testing
-    predTest <- predict(fit, testData)  
-    performTest <- matrix(evalPerformance(predTest, testData$Y), ncol = 3, nrow = 1)
+    predTest <- predict(fit, fullTest)  
+    performTest <- matrix(evalPerformance(predTest, fullTest$Y), ncol = 3, nrow = 1)
     
     # here: calculate prediction bias and prediction variance
     predBias <- NA_real_
@@ -127,7 +142,8 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
     #   -> this should have identical dimensions across ...
     #       ... all simulated conditions (P = {4, 8}) 
     #       ... and all datasets/feature sets used for fitting the model
-    coefMat <- matrix(rep(NA_real_, (1 + max(params$dgp$P) + max(params$dgp$Q)) * 2), nrow = 2)
+    # coefMat <- matrix(rep(NA_real_, (1 + max(params$dgp$P) + max(params$dgp$Q)) * 2), nrow = 2) # with SE
+    coefMat <- matrix(rep(NA_real_, (1 + max(params$dgp$P) + max(params$dgp$Q))), nrow = 1) # without SE
     colnames(coefMat) <- c("(Intercept)", 
                            paste0("X", seq_len(max(params$dgp$P))), 
                            rep("score", max(params$dgp$Q)))
@@ -152,18 +168,20 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
       # {RMSE, Rsquared, MAE} x {CVtest, train, HOtest}
       performVec = cbind(performCVtest, performTrain, performTest), 
       # prediction bias and prediction variance 
-      predError = matrix(c(predBias, predVar), ncol = 2, nrow = 1),
+      # predError = matrix(c(predBias, predVar), ncol = 2, nrow = 1),
       # predictor choice by extracting regression coefficients (for all possible coefficients)
       # matrix with regression coefficients in row 1 and (no) SEs in row 2 
       regCoef = coefMat,
       # save hyperparameter values to check if cross validation chose ridge 
-      hyperParams = matrix(c(fit$bestTune$alpha, fit$bestTune$lambda), ncol = 2, nrow = 1)) 
+      hyperParams = matrix(c(alpha = fit$bestTune$alpha, lambda = fit$bestTune$lambda), ncol = 2, nrow = 1)) 
 
   })
   
   # build results object to return
-  resPenReg <- vector(mode = "list", 4)
-  names(resPenReg) <- c("performVec", "predError", "regCoef", "hyperParams")
+  # resPenReg <- vector(mode = "list", 4)
+  # names(resPenReg) <- c("performVec", "predError", "regCoef", "hyperParams")
+  resPenReg <- vector(mode = "list", 3)
+  names(resPenReg) <- c("performVec", "regCoef", "hyperParams")
   
   # object with results to return to fitData Script 
   resPenReg[["performVec"]] <- do.call(rbind, lapply(predSetRes, `[[`, "performVec"))
@@ -172,7 +190,7 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
                                                           c("CVtest", "train", "HOtest")), 
                                               "names"))[["names"]]
   
-  resPenReg[["predError"]] <- do.call(rbind, lapply(predSetRes, `[[`, "predError"))
+  # resPenReg[["predError"]] <- do.call(rbind, lapply(predSetRes, `[[`, "predError"))
   resPenReg[["regCoef"]] <- do.call(rbind, lapply(predSetRes, `[[`, "regCoef"))
   resPenReg[["hyperParams"]] <- do.call(rbind, lapply(predSetRes, `[[`, "hyperParams"))
   
