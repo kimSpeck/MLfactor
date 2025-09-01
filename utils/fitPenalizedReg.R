@@ -24,7 +24,7 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
   
   # fit only items, only scores, fit items + scores
   # ... implement this by different vectors of variable names
-  itemNames <- paste0("X", seq_len(grid$P[iSim]))
+  itemNames <- colnames(trainData)[stringr::str_detect(colnames(trainData), "^X[:digit:]+")]
   
   # fit every combination of predictors for regMode = {ridge, enet}
   if (regMode != "itemENET") { 
@@ -45,7 +45,7 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
     #   Unpenalized features are still estimated jointly, so their coefficients can 
     #   change with lambda because the penalized part of the model changes; they’re just not directly shrunk.
     penaltyFactor <- c(rep(params$fit$defaultPenalty, length(itemNames)), 
-                       rep(params$fit$noPenalty,  grid$Q[iSim]))
+                       rep(params$fit$noPenalty,  params$dgp$Q))
     names(penaltyFactor) <- c(itemNames, "score")
   }
   

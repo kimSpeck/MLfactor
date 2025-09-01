@@ -12,13 +12,13 @@ fitOLS <- function(trainData, testData, foldid) {
     stop("Fold-ID vector and data have not the same length!")
   }
   
-  if (grid$Q[iSim] > 1) {
+  if (any(params$dgp$grid$Q > 1)) {
     stop("Result object is not implemented for multiple factors.")
   }
   
   # fit only items, only scores, fit items + scores
   # ... implement this by different vectors of variable names
-  itemNames <- paste0("X", seq_len( grid$P[iSim]))
+  itemNames <- colnames(trainData)[stringr::str_detect(colnames(trainData), "^X[:digit:]+")]
   trainPredSets <- list(itemNames, "score", c(itemNames, "score"))
   
   # # test it 
