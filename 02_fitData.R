@@ -1,15 +1,14 @@
 ################################################################################
 # fit data
 ################################################################################
-
 # Model fitting
 library(parallel) # fit models in parallel across samples
 library(glmnet)   # ENET
 library(caret)    # GBM
+library(tidyr)    # GBM
 
 # load parameters & custom functions 
 source("utils/setParam.R") # parameter values
-# source("utils/simTools.R") 
 source("utils/utilityFUNS.R")
 source("utils/fitTools.R")
 
@@ -31,7 +30,7 @@ createFolder(logFolder)
 
 timeStamp <- format(Sys.time(), "%d%m%y_%H%M%S")
 # nCoresSampling <- detectCores() - 1 
-nCoresSampling <- 30
+nCoresSampling <- 50
 
 grid <- params$dgp$grid
 
@@ -41,6 +40,8 @@ grid <- params$dgp$grid
 # prediction based on linear regression and based on elastic net regression
 #   ... prediction based on items and based on composite
 #   ... prediction based on predictor set with group, without group, with group predicted from items
+
+params$sim$nTrain <- 30
 
 results <- lapply(seq_len(nrow(grid)), function(iSim) {
   
@@ -70,25 +71,40 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
     if (iSample == 1) {
       print(paste0(conditionFolder,
                    "; first Sample at ", format(Sys.time(), "%d%m%y_%H%M%S")))  
+    } else if (iSample == (params$sim$nTrain/2)) {
+      print(paste0(conditionFolder,
+                   "; half-time at ", format(Sys.time(), "%d%m%y_%H%M%S")))  
+    } else if (iSample == params$sim$nTrain) {
+      print(paste0(conditionFolder,
+                   "; final Sample at ", format(Sys.time(), "%d%m%y_%H%M%S")))  
     }
     
     # here: load actually simulated data! object names?!
     # load training and holdout test data for single sample rda files
     # load training sample
-    load(paste0(dataFolder, "/", conditionFolder, "/sample_", iSample, ".rda"))
+    trainSample <- loadRData(paste0(dataFolder, "/", conditionFolder, "/sample_", iSample, ".rda"))
     
     # load test data
-    # setParam$dgp$nTest == 1
-    load(paste0(dataFolder, "/", conditionFolder, "/sample_test1.rda"))
+    testSample <- loadRData(paste0(dataFolder, "/", conditionFolder, "/sample_test1.rda"))
     
     # lapply over different conditions of sample sizes
     # test it!
     estN <- lapply(seq_along(params$dgp$trainN), function(iN) { 
       
       # random sampling from training sample (reproducible?)
-      sampleIdx <- sample(seq_len(max(params$dgp$trainN)), size = params$dgp$trainN[iN], 
-                          replace = FALSE)
-      dataSubset <- data[sampleIdx, ]
+      # this needs to be done separately for the two groups!
+      #   otherwise the manipulation of the MI violation is not correct anymore
+      # 1. generate two sets of indices for group = 0 and for group = 1
+      # 2. sample the params$dgp$trainN[iN]/2 indices from both sets of indices
+      # 3. generate the trainData subset of size params$dgp$trainN[iN] with 50%
+      #     group 0 and group 1 respectively by using the union of both index sets
+      gZeroIDX <- which(trainSample$group == 0)
+      gOneIDX <- which(trainSample$group == 1)
+      sampleIdx <- c(sample(gZeroIDX, size = (params$dgp$trainN[iN]/params$dgp$nGroups), 
+                            replace = FALSE),
+                     sample(gOneIDX, size = (params$dgp$trainN[iN]/params$dgp$nGroups), 
+                            replace = FALSE))
+      trainSubset <- trainSample[sampleIdx, ]
       
       # # checks
       # length(sampleIdx)
@@ -108,27 +124,23 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
       names(modelList) <- c("fit_LM", "fit_Ridge", "fit_ENET", "fit_ENETitems")
       
       # linear regression 
-      modelList[["fit_LM"]] <- fitOLS(trainData = dataSubset, 
-                       #here: change the testData object to actual testData
-                       testData = data[which(!(seq_len(dim(data)[1]) %in% sampleIdx)),],  
+      modelList[["fit_LM"]] <- fitOLS(trainData = trainSubset, 
+                       testData = testSample,  
                        foldid = foldid) 
       
       # ridge regression
-      modelList[["fit_Ridge"]] <- fitRegReg(trainData = dataSubset,
-                             #here: change the testData object to actual testData
-                             testData = data[which(!(seq_len(dim(data)[1]) %in% sampleIdx)),],  
+      modelList[["fit_Ridge"]] <- fitRegReg(trainData = trainSubset,
+                             testData = testSample,
                              foldid = foldid, regMode = "ridge") 
       
       # elastic net regression
-      modelList[["fit_ENET"]] <- fitRegReg(trainData = dataSubset, 
-                            #here: change the testData object to actual testData
-                            testData = data[which(!(seq_len(dim(data)[1]) %in% sampleIdx)),],  
+      modelList[["fit_ENET"]] <- fitRegReg(trainData = trainSubset, 
+                            testData = testSample,
                             foldid = foldid, regMode = "enet") 
       
       # elastic net regression only item penalty
-      modelList[["fit_ENETitems"]] <- fitRegReg(trainData = dataSubset, 
-                                 #here: change the testData object to actual testData
-                                 testData = data[which(!(seq_len(dim(data)[1]) %in% sampleIdx)),],  
+      modelList[["fit_ENETitems"]] <- fitRegReg(trainData = trainSubset, 
+                                 testData = testSample,
                                  foldid = foldid, regMode = "itemENET") 
       
       list(performVec = cbind(sample = iSample, N = rep(params$dgp$trainN[iN]), 
@@ -179,69 +191,3 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
   saveRDS(estRes, file = resFileName)
   
 })
-
-######
-#  true prediction by using Construct and specific item effect both as predictors
-#    ->  this is not feasible anymore; specific item effects are simulated as latent 
-#        factors that are not identified and therefore cannot be estimated within the model
-# # Regressions
-# lm.items = lm(data.Y~.,itms.train)
-# lm.comp = lm(data.Y~.,comp.train)
-# lm.comb = lm(data.Y~.,comb.train)
-# 
-# # observed coefficients excluding intercept
-# items.coef = coef(lm.items)[2:(J + 1)]
-# comp.coef = coef(lm.comp)[2:(params$M + 1)]
-# comb.coef = coef(lm.comb)[2:(J + params$M + 1)]
-# 
-# # Compute the w/in sample bias for both models at the observation level
-# #   ->  this is not feasible anymore; specific item effects are simulated as latent 
-# #       factors that are not identified and therefore cannot be estimated within the model
-# 
-# #Calculate Holdout Prediction
-# itms.pred = predict(lm.items,itms.test)
-# comp.pred = predict(lm.comp,comp.test)
-# comb.pred = predict(lm.comb,comb.test)
-# 
-# #Preparing Output
-# mat = rep(NA, 28)
-# 
-# #Condition Information
-# mat[1] = seed; mat[2] = N.train; mat[3] = J #note that N -holdout is returned not total N
-# mat[4] = betaS;mat[5] = betaT; mat[6] = measVar.cond #beta_S, beta_T, and measVar conditions
-# mat[7] = nGroups; mat[8] = miItems; mat[9] = miWeight; mat[10] = mSpecific
-# #Bias
-# mat[11] = NA
-# mat[12] = NA
-# mat[13] = NA
-# 
-# #Variance
-# mat[14] = NA
-# mat[15] = NA
-# mat[16] = NA
-# 
-# #within samp error
-# mat[17] = NA
-# mat[18] = NA
-# mat[19] = NA
-# 
-# #Holdout RMSE
-# mat[20] = calcRMSE(itms.pred,itms.test[,"data.Y"])
-# mat[21] = calcRMSE(comp.pred,comp.test[,"data.Y"])
-# mat[22] = calcRMSE(comb.pred,comb.test[,"data.Y"])
-# mat[23] = NA
-# 
-# # test R2
-# mat[24] <- evalPerformance(itms.pred,itms.test[,"data.Y"])["Rsquared"]
-# mat[25] <- evalPerformance(comp.pred,comp.test[,"data.Y"])["Rsquared"]
-# mat[26] <- evalPerformance(comb.pred,comb.test[,"data.Y"])["Rsquared"]
-# mat[27] <- NA
-# 
-# names(mat) <-  c("Seed","N","J","beta_S","beta_T","measVar",
-#                  "nGroups", "miItems", "miWeight", "mSpecific",
-#                  "item.bias","comp.bias","true.bias",
-#                  "item.var","comp.var","true.var",
-#                  "item.err","comp.err","true.err",
-#                  "item.rmse","comp.rmse", "comb.rmse", "true.rmse",
-#                  "item.R2", "comp.R2", "comb.R2", "true.R2",
-#                  "sim.R2")
