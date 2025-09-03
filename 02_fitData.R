@@ -16,9 +16,6 @@ source("utils/fitTools.R")
 source("utils/fitOLS.R")
 source("utils/fitPenalizedReg.R")
 
-# functions to calculate and save outcome measures from models
-# source("utils/saveResults.R")
-
 # build folder structure
 dataFolder <- "data"
 
@@ -30,9 +27,29 @@ createFolder(logFolder)
 
 timeStamp <- format(Sys.time(), "%d%m%y_%H%M%S")
 # nCoresSampling <- detectCores() - 1 
-nCoresSampling <- 50
+nCoresSampling <- 20
 
 grid <- params$dgp$grid
+
+# check which conditions are already fitted
+listResFiles <- list.files(resFolder)
+fittedConds <- matrix(NA, ncol = 8, nrow = length(listResFiles))
+rowIDX <- rep(NA, length(listResFiles))
+for (iFile in seq_along(listResFiles)) {
+  tmpCond <- matrix(unlist(parseFilename(listResFiles[iFile])), ncol = 8, nrow = 1)
+  names(tmpCond) <- c("MIvio", "miItems", "P", "Q", "cAlpha", "varT", "corGO", "R2")
+  fittedConds[iFile,] <- tmpCond
+  rowIDX[iFile] <- rownames(grid[grid$MIvio == tmpCond["MIvio"] &
+          grid$miItems == tmpCond["miItems"] &
+          grid$P == tmpCond["P"] &
+          grid$Q == tmpCond["Q"] &
+          grid$cAlpha == tmpCond["cAlpha"] &
+          grid$varT == tmpCond["varT"] &
+          grid$corGO == tmpCond["corGO"] &
+          grid$R2 == tmpCond["R2"],])
+}
+# sort(as.numeric(rowIDX)) # first 142 rows in condition grid are fitted
+grid <- grid[!(rownames(grid) %in% rowIDX), ]
 
 # only load biggest dataset! draw random subsamples and fit smaller subsets
 # this is done to avoid excessive memory requirements to save the data!
@@ -70,13 +87,7 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
     if (iSample == 1) {
       print(paste0(conditionFolder,
                    "; first Sample at ", format(Sys.time(), "%d%m%y_%H%M%S")))  
-    } else if (iSample == (params$sim$nTrain/2)) {
-      print(paste0(conditionFolder,
-                   "; half-time at ", format(Sys.time(), "%d%m%y_%H%M%S")))  
-    } else if (iSample == params$sim$nTrain) {
-      print(paste0(conditionFolder,
-                   "; final Sample at ", format(Sys.time(), "%d%m%y_%H%M%S")))  
-    }
+    } 
     
     # here: load actually simulated data! object names?!
     # load training and holdout test data for single sample rda files
@@ -176,9 +187,6 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
   tEnd <- Sys.time() # time monitoring
   difftime(tEnd, tStart)
   
-  # close cluster to return resources (memory) back to OS
-  stopCluster(cl)
-  
   # manage data
   # save separate each simulated condition in rds files  
   #   -> pro: skip fitted condGrid conditions if algorithm does not run till the end...
@@ -188,5 +196,9 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
                         "_varT", grid$varT[iSim], "_corGO", grid$corGO[iSim], 
                         "_R2", grid$R2[iSim], ".rds")
   saveRDS(estRes, file = resFileName)
+  
+  # close cluster to return resources (memory) back to OS
+  stopCluster(cl)
+  gc()
   
 })
