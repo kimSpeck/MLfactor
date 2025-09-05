@@ -37,3 +37,29 @@ parseFilename <- function(x) {
   out["MIvio"] <- substring(out["MIvio"], 6, nchar(out["MIvio"]))
   out
 }
+
+
+themeFunctionPaper <- function(plotObject, guides = T){
+  pTmp <- plotObject + theme(
+    panel.grid.major = element_line(linewidth = 0.15, linetype = 'solid', color = "lightgrey"), 
+    panel.grid.minor = element_line(linewidth = 0.1, linetype = 'solid', color = "lightgrey"),
+    panel.background = element_rect(color = "white", fill = "white"),
+    plot.title = element_text(size = 30, face = "bold"),
+    axis.text.y = element_text(size = 20),
+    axis.text.x = element_text(size = 20),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20),
+    strip.text.x = element_text(size = 15),
+    strip.text.y = element_text(size = 15),
+    #legend.position = c(.85, .39), 
+    legend.position = "bottom", 
+    legend.title = element_text(size = 25),
+    legend.text = element_text(size = 20),
+    legend.key.width = unit(2, "cm"),
+    legend.box = "horizontal")
+  if (guides == F) {
+    pTmp <- pTmp + guides(color = "none", shape = "none", linetype = "none")
+  }
+  return(pTmp)
+}
+
