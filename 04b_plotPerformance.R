@@ -9,13 +9,13 @@ library(tidyverse)
 resFolder <- "results"
 depFolder <- "dependentMeasures"
 
-resFile <- paste0(resFolder, "/", depFolder, "/performStats.rda")
-load(resFile)
-
 plotFolder <- "plots"
 createFolder(plotFolder)
 plotPerformanceFolder <- "performance"
 createFolder(paste0(plotFolder, "/", plotPerformanceFolder))
+
+resFile <- paste0(resFolder, "/", depFolder, "/performStats.rda")
+load(resFile)
 
 ################################################################################
 # plot test plot

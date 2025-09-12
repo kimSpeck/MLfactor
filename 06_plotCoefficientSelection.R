@@ -16,66 +16,95 @@ load(resFile)
 
 plotFolder <- "plots"
 createFolder(plotFolder)
-plotPerformanceFolder <- "performance"
-createFolder(paste0(plotFolder, "/", plotPerformanceFolder))
+plotCoefFolder <- "coefficients"
+createFolder(paste0(plotFolder, "/", plotCoefFolder))
 
+################################################################################
+# plot (all) regression coefficients as violin half plots
+################################################################################
 coefMatrix$miItemsPlot <- ifelse(coefMatrix$miItems %in% c(2, 4), "P/2", coefMatrix$miItems)
 coefMatrix$N <- factor(coefMatrix$N, levels = c(100, 300, 1000))
 coefMatrix$MIvio <- factor(coefMatrix$MIvio, levels = c("specific", "metric", "scalar"))
+coefMatrix$model <- factor(coefMatrix$model, levels = c("itemENET", "ENET", "Ridge"))
 
-# Does ENET or itemENET keep items with MI violations or specific effects more often 
-#   than without manipulation? 
 coef_pDiffSub <- coefMatrix[coefMatrix$cAlpha == 0.8 & # for ENET
-                        coefMatrix$model %in% c("ENET", "itemENET") & # for ENET
+                        coefMatrix$model %in% c("ENET", "itemENET", "Ridge") & # for ENET
                         coefMatrix$varT == 0.25 & # condition with larger MI effect
                         coefMatrix$R2 == 0.8, ] # due to scaling numerically bigger
 
 coef_pDiffSub <- tidyr::pivot_longer(coef_pDiffSub, 
-                               cols = !c(MIvio, miItems, P, Q, cAlpha, varT, corGO,
-                                         R2, sample, N, model, predSet, miItemsPlot),
+                               cols = !c(MIvio, miItemsPlot, miItems, P, Q, cAlpha, varT, corGO,
+                                         R2, sample, N, model, predSet),
                                names_to = "coefficient", values_to = "value")
+coef_pDiffSub$coefficient <- factor(coef_pDiffSub$coefficient, 
+                                    levels = c("X1", "X2", "X3", "X4", "X5", "X6", 
+                                               "X7", "X8", "score", "intercept"))
 
-ggplot(coef_pDiffSub[coef_pDiffSub$P == 4 &
-                       coef_pDiffSub$predSet == "comb" &
-                       coef_pDiffSub$miItemsPlot == 1 &
-                       coef_pDiffSub$coefficient %in% c("X1", "X2", "X3", "X4", "score"),], 
-       aes(x = interaction(N, model), y = value, fill = coefficient, color = coefficient)) +
-  coord_flip() + 
-  geom_violinhalf(width=2.1, alpha = 0.5) +
-  xlab("") +
-  ylab("Regression Coefficients")+
-  facet_grid(corGO ~ MIvio)
-  
+pVec <- unique(coef_pDiffSub$P)
+predSetVec <- unique(coef_pDiffSub$predSet) # c("items", "comb")
+miItemsVec <- unique(coef_pDiffSub$miItemsPlot)
+corGOvec <- unique(coef_pDiffSub$corGO)
 
-ggplot(testSub[testSub$MIvio == "metric" &
-                 testSub$predSet == "comb" & 
-                 testSub$coefficient %in% c("X1", "X2", "X3", "X4", "score"),], 
-       aes(x = N, y = value, fill = coefficient, color = coefficient)) +
-  geom_violinhalf(width=2.1, alpha = 0.5) +
-  xlab("") +
-  ylab("Regression Coefficients")+
-  facet_wrap(~ cAlpha + corGO) +
-  coord_flip() 
+itemCol = c("#5C6BC0", "#42A5F5", "#29B6F6", "#26C6DA", "#26A69A", "#66BB6A", "#9CCC65", "#D4E157")
+miCol <- c("#FFA726", "#FF7043", "#EF5350", "#EC407A")
+scoreCol <- c("#000000")
 
-ggplot(testSub[testSub$MIvio == "scalar" &
-                 testSub$predSet == "items" & 
-                 testSub$coefficient %in% c("X1", "X2", "X3", "X4"),], 
-       aes(x = N, y = value, fill = coefficient, color = coefficient)) +
-  geom_violinhalf(width=2.1, alpha = 0.5) +
-  xlab("") +
-  ylab("Regression Coefficients")+
-  facet_wrap(~ cAlpha + corGO) +
-  coord_flip() 
 
-ggplot(testSub[testSub$MIvio == "specific" &
-                 testSub$predSet == "items" & 
-                 testSub$coefficient %in% c("X1", "X2", "X3", "X4"),], 
-       aes(x = N, y = value, fill = coefficient, color = coefficient)) +
-  geom_violinhalf(width=2.1, alpha = 0.5) +
-  xlab("") +
-  ylab("Regression Coefficients")+
-  facet_wrap(~ cAlpha + corGO) +
-  coord_flip() 
+for (iP in pVec) {
+  for (iPredSet in predSetVec) {
+    for (iMI in seq_along(miItemsVec)) {
+      for (iCor in corGOvec) {
+        
+        print(paste(iP, iPredSet, iMI, iCor))
+        
+        if (iP == "4") {
+          nMIitems = c(0, 1, 2)[iMI]
+        } else {
+          nMIitems = c(0, 1, 4)[iMI]
+        }
+        
+        subTmp <- coef_pDiffSub[coef_pDiffSub$P == iP &
+                                  coef_pDiffSub$predSet == iPredSet &
+                                  coef_pDiffSub$miItems == nMIitems &
+                                  coef_pDiffSub$corGO == iCor &
+                                  coef_pDiffSub$coefficient != "intercept",] 
+        
+        # nMIitems <- ifelse(iMI == "P/2", as.numeric(iP)/2, as.numeric(iMI))
+        
+        if (iPredSet == "comb") {
+          colVec <- c(itemCol[seq_len(as.numeric(iP) - nMIitems)], 
+                      miCol[seq_len(nMIitems)],
+                      scoreCol)  
+        } else if (iPredSet != "comb") {
+          colVec <- c(itemCol[seq_len(as.numeric(iP) - nMIitems)], 
+                      miCol[seq_len(nMIitems)])
+        }
+        
+        pTmp <- ggplot(subTmp, 
+               aes(x = model, y = value, fill = coefficient, color = coefficient)) +
+          coord_flip() + 
+          geom_violinhalf(width=2.1, alpha = 0.5) +
+          xlab("") +
+          ylab("Regression Coefficients") +
+          scale_color_manual(values = colVec) + 
+          scale_fill_manual(values = colVec) +
+          geom_abline(intercept = 0, slope = 0, "black", alpha = 0.5) +
+          #geom_vline(aes(xintercept = 0), color = "black", alpha = 0.5) +
+          facet_grid(N ~ MIvio)
+        
+        pTmp <- themeFunctionPaper(pTmp)
+        
+        ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCoefFolder, "/pCoef_P", 
+                                          iP, "_MIitems", nMIitems, "_", iPredSet, "_cor", iCor, ".png"),
+                        plot = pTmp,
+                        width = 13.63,
+                        height = 12.07,
+                        units = "in")
+        
+      }
+    }
+  }
+}
 
 # Item 4 is the one with the manipulation
 colVec <- c( "#006400", "#FF7F50", "#B22222") 
@@ -93,6 +122,8 @@ ggplot(testSub[testSub$MIvio == "metric" &
   #ylab(paste0("difference in ", iMT, " (items - LM score)")) +
   facet_wrap(~ cAlpha + corGO)
 
+# Does ENET or itemENET keep items with MI violations or specific effects more often 
+#   than without manipulation? 
 # maybe remove ENET and itemENET if alpha = 0, because ENET would not have been able 
 #   to do variable selection!
 # Is there a difference between the manipulations in item selection?
