@@ -152,7 +152,7 @@ for (iCond in seq_len(dim(grid)[1])) {
     scale_fill_gradientn(colours = col(200),
                          limits = c(min(sigmaDF$varCov), max(sigmaDF$varCov))) +
     geom_text(aes(label = round(varCov, 2)), size = 3) +
-    scale_y_discrete(limits = rev(levels(sigmaDF$dim2))) +  # 👈 flip y-axis
+    scale_y_discrete(limits = rev(levels(sigmaDF$dim2))) + 
     coord_fixed() +
     theme_minimal() +
     xlab("") + ylab("") +
