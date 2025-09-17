@@ -142,54 +142,60 @@ lineTypeVec <- c("solid", "dashed", "dotted")
 
 diffScalar <- diffSub[diffSub$MIvio == "scalar" &
                           diffSub$model == "LM" &
-                          diffSub$R2 == 0.8 &
                           diffSub$varT == 0.25, ]
 
 diffScalar$miItemsPlot <- factor(diffScalar$miItemsPlot, 
                                  levels = c("0", "1", "P/2"))
 
+r2Vec = unique(diffScalar$R2)
 cAlphaVec = unique(diffScalar$cAlpha)
 pVec = unique(diffScalar$P)
 corVec = unique(diffScalar$corGO)
 
-for (iP in pVec) {
-  for (iCA in cAlphaVec) {
-    for (iCor in corVec) {
-      pScalarTmp <- ggplot(diffScalar[diffScalar$cAlpha == iCA &
-                                        diffScalar$P == iP &
-                                        diffScalar$corGO == iCor &
-                                        diffScalar$measure_type == "Rsquared_HOtest",], 
-                           aes(x = N, y = M, group = miItemsPlot, color = miItemsPlot, linetype = miItemsPlot)) +
-        geom_abline(intercept = 0, slope = 0, "black", alpha = 0.5) +
-        geom_errorbar(aes(ymin = M - 2*SD, ymax = M + 2*SD), alpha = 0.5, width = 0.15) + 
-        geom_point(size = 5) +
-        geom_line(alpha = 0.8, linewidth = 1.66) +
-        # scale_shape_manual(values = shapeVec) +
-        scale_color_manual(values = colVec) +
-        scale_linetype_manual(values = lineTypeVec) +
-        scale_y_continuous(limits = c(-0.075, 0.2),
-                           breaks = seq(0, 0.2, by = 0.1)) +
-        ylab("") + xlab("") +
-        guides(color = "none", 
-               linetype = "none")
-      
-      (pScalarTmp <- themeFunctionPaper(pScalarTmp))
-      
-      ggplot2::ggsave(filename = paste0(plotFolder, "/", plotPresentFolder, 
-                                        "/pScalar_Rsquared_HOtest", 
-                                        "_cAlpha", iCA, "_p", iP, "_cor", iCor, ".png"),
-                      plot = pScalarTmp,
-                      width = 11.56,
-                      height = 9.77,
-                      units = "in")
-      
+for (iR in r2Vec) {
+  for (iP in pVec) {
+    for (iCA in cAlphaVec) {
+      for (iCor in corVec) {
+        pScalarTmp <- ggplot(diffScalar[diffScalar$cAlpha == iCA &
+                                          diffScalar$P == iP &
+                                          diffScalar$R2 == iR &
+                                          diffScalar$corGO == iCor &
+                                          diffScalar$measure_type == "Rsquared_HOtest",], 
+                             aes(x = N, y = M, group = miItemsPlot, color = miItemsPlot, linetype = miItemsPlot)) +
+          geom_abline(intercept = 0, slope = 0, "black", alpha = 0.5) +
+          geom_errorbar(aes(ymin = M - 2*SD, ymax = M + 2*SD), alpha = 0.5, width = 0.15) + 
+          geom_point(size = 5) +
+          geom_line(alpha = 0.8, linewidth = 1.66) +
+          # scale_shape_manual(values = shapeVec) +
+          scale_color_manual(values = colVec) +
+          scale_linetype_manual(values = lineTypeVec) +
+          scale_y_continuous(limits = c(-0.075, 0.2),
+                             breaks = seq(0, 0.2, by = 0.1)) +
+          ylab("") + xlab("") +
+          guides(color = "none", 
+                 linetype = "none")
+        
+        (pScalarTmp <- themeFunctionPaper(pScalarTmp))
+        
+        ggplot2::ggsave(filename = paste0(plotFolder, "/", plotPresentFolder, 
+                                          "/pScalar_Rsquared_HOtest", 
+                                          "_cAlpha", iCA, "_p", iP, "_cor", iCor, 
+                                          "_R2", iR, ".png"),
+                        plot = pScalarTmp,
+                        width = 11.56,
+                        height = 9.77,
+                        units = "in")
+        
+      }
     }
   }
 }
 
 
+
 for (iP in pVec) {
   pScalar2x3 <- ggplot(diffScalar[diffScalar$P == iP &
+                                    diffScalar$R2 == 0.8 &
                                     diffScalar$measure_type == "Rsquared_HOtest",], 
                        aes(x = N, y = M, group = miItemsPlot, color = miItemsPlot, linetype = miItemsPlot)) +
     geom_abline(intercept = 0, slope = 0, "black", alpha = 0.5) +
@@ -211,6 +217,97 @@ for (iP in pVec) {
   ggplot2::ggsave(filename = paste0(plotFolder, "/", plotPresentFolder, 
                                     "/pScalar_Rsquared_HOtest_cAlphaxCor_P", iP,".png"),
                   plot = pScalar2x3,
+                  width = 11.56,
+                  height = 9.77,
+                  units = "in")
+}
+
+################################################################################
+# plot metric effect
+################################################################################
+# plot only LM results, first
+# R² = 0.8, corGO = 0 (aber essentially egal), varT = 0.25
+# ... p = 4 vs. p = 8 (without correlation) and cAlpha = 0.8 vs. cAlpha = 0.6
+
+colVec <- c("#003399", "#c9211e", "#c9211e") 
+lineTypeVec <- c("solid", "dashed", "dotted")
+
+diffMetric <- diffSub[diffSub$MIvio == "metric" &
+                        diffSub$model == "LM" &
+                        diffSub$varT == 0.25, ]
+
+diffMetric$miItemsPlot <- factor(diffMetric$miItemsPlot, 
+                                 levels = c("0", "1", "P/2"))
+
+r2Vec = unique(diffMetric$R2)
+cAlphaVec = unique(diffMetric$cAlpha)
+pVec = unique(diffMetric$P)
+corVec = unique(diffMetric$corGO)
+
+for (iR in r2Vec) {
+  for (iP in pVec) {
+    for (iCA in cAlphaVec) {
+      for (iCor in corVec) {
+        pMetricTmp <- ggplot(diffMetric[diffMetric$cAlpha == iCA &
+                                          diffMetric$P == iP &
+                                          diffMetric$R2 == iR &
+                                          diffMetric$corGO == iCor &
+                                          diffMetric$measure_type == "Rsquared_HOtest",], 
+                             aes(x = N, y = M, group = miItemsPlot, color = miItemsPlot, linetype = miItemsPlot)) +
+          geom_abline(intercept = 0, slope = 0, "black", alpha = 0.5) +
+          geom_errorbar(aes(ymin = M - 2*SD, ymax = M + 2*SD), alpha = 0.5, width = 0.15) + 
+          geom_point(size = 5) +
+          geom_line(alpha = 0.8, linewidth = 1.66) +
+          # scale_shape_manual(values = shapeVec) +
+          scale_color_manual(values = colVec) +
+          scale_linetype_manual(values = lineTypeVec) +
+          scale_y_continuous(limits = c(-0.075, 0.2),
+                             breaks = seq(0, 0.2, by = 0.1)) +
+          ylab("") + xlab("") +
+          guides(color = "none", 
+                 linetype = "none")
+        
+        (pMetricTmp <- themeFunctionPaper(pMetricTmp))
+        
+        ggplot2::ggsave(filename = paste0(plotFolder, "/", plotPresentFolder, 
+                                          "/pMetric_Rsquared_HOtest", 
+                                          "_cAlpha", iCA, "_p", iP, "_R2", iR, 
+                                          "_cor", iCor, ".png"),
+                        plot = pMetricTmp,
+                        width = 11.56,
+                        height = 9.77,
+                        units = "in")
+        
+      }
+    }
+  }
+}
+
+
+
+for (iP in pVec) {
+  pMetric2x3 <- ggplot(diffMetric[diffMetric$P == iP &
+                                    diffMetric$measure_type == "Rsquared_HOtest",], 
+                       aes(x = N, y = M, group = miItemsPlot, color = miItemsPlot, linetype = miItemsPlot)) +
+    geom_abline(intercept = 0, slope = 0, "black", alpha = 0.5) +
+    geom_errorbar(aes(ymin = M - 2*SD, ymax = M + 2*SD), alpha = 0.5, width = 0.15) + 
+    geom_point(size = 3) +
+    geom_line(alpha = 0.8, linewidth = 1) +
+    # scale_shape_manual(values = shapeVec) +
+    scale_color_manual(values = colVec) +
+    scale_linetype_manual(values = lineTypeVec) +
+    scale_y_continuous(limits = c(-0.075, 0.2),
+                       breaks = seq(0, 0.2, by = 0.1)) +
+    ylab("") + xlab("") +
+    facet_grid(corGO ~ cAlpha) +
+    guides(color = "none", 
+           linetype = "none")
+  
+  (pMetric2x3 <- themeFunctionPaper(pMetric2x3))
+  
+  ggplot2::ggsave(filename = paste0(plotFolder, "/", plotPresentFolder, 
+                                    "/pMetric_Rsquared_HOtest_cAlphaxCor_P", iP,".png"),
+                  plot = pMetric2x3,
                   width = 11.56,
                   height = 9.77,
                   units = "in")
