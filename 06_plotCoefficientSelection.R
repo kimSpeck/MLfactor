@@ -22,15 +22,17 @@ createFolder(paste0(plotFolder, "/", plotCoefFolder))
 ################################################################################
 # plot (all) regression coefficients as violin half plots
 ################################################################################
+# plot only N = 1000
+# add LM regression coefficients to the plots 
+# plot all combinations of cAlpha, varT, R2 and corGO
 coefMatrix$miItemsPlot <- ifelse(coefMatrix$miItems %in% c(2, 4), "P/2", coefMatrix$miItems)
 coefMatrix$N <- factor(coefMatrix$N, levels = c(100, 300, 1000))
 coefMatrix$MIvio <- factor(coefMatrix$MIvio, levels = c("specific", "metric", "scalar"))
-coefMatrix$model <- factor(coefMatrix$model, levels = c("itemENET", "ENET", "Ridge"))
+coefMatrix$model <- factor(coefMatrix$model, levels = c("itemENET", "ENET", "Ridge", "LM"))
 
 coef_pDiffSub <- coefMatrix[coefMatrix$cAlpha == 0.8 & # for ENET
-                        coefMatrix$model %in% c("ENET", "itemENET", "Ridge") & # for ENET
-                        coefMatrix$varT == 0.25 & # condition with larger MI effect
-                        coefMatrix$R2 == 0.8, ] # due to scaling numerically bigger
+                        #coefMatrix$model %in% c("ENET", "itemENET", "Ridge") & # for ENET
+                        coefMatrix$varT == 0.25, ] # due to scaling numerically bigger
 
 coef_pDiffSub <- tidyr::pivot_longer(coef_pDiffSub, 
                                cols = !c(MIvio, miItemsPlot, miItems, P, Q, cAlpha, varT, corGO,
@@ -41,9 +43,11 @@ coef_pDiffSub$coefficient <- factor(coef_pDiffSub$coefficient,
                                                "X7", "X8", "score", "intercept"))
 
 pVec <- unique(coef_pDiffSub$P)
-predSetVec <- unique(coef_pDiffSub$predSet) # c("items", "comb")
 miItemsVec <- unique(coef_pDiffSub$miItemsPlot)
 corGOvec <- unique(coef_pDiffSub$corGO)
+# r2vec <- unique(coef_pDiffSub$R2)
+predSetVec <-  c("items", "comb")
+
 
 itemCol = c("#5C6BC0", "#42A5F5", "#29B6F6", "#26C6DA", "#26A69A", "#66BB6A", "#9CCC65", "#D4E157")
 miCol <- c("#FFA726", "#FF7043", "#EF5350", "#EC407A")
@@ -64,6 +68,7 @@ for (iP in pVec) {
         }
         
         subTmp <- coef_pDiffSub[coef_pDiffSub$P == iP &
+                                  # coef_pDiffSub$R2 == iR2 &
                                   coef_pDiffSub$predSet == iPredSet &
                                   coef_pDiffSub$miItems == nMIitems &
                                   coef_pDiffSub$corGO == iCor &
@@ -90,7 +95,7 @@ for (iP in pVec) {
           scale_fill_manual(values = colVec) +
           geom_abline(intercept = 0, slope = 0, "black", alpha = 0.5) +
           #geom_vline(aes(xintercept = 0), color = "black", alpha = 0.5) +
-          facet_grid(N ~ MIvio)
+          facet_grid(R2 ~ MIvio)
         
         pTmp <- themeFunctionPaper(pTmp)
         
