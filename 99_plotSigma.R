@@ -18,6 +18,7 @@ sapply(packageVec, function(iPackage) {
 
 library(magic)
 library(lavaan)
+library(tidyverse)
 
 timeStampFolder <- format(Sys.time(), "%d%m%y_%H%M%S")
 
@@ -59,7 +60,8 @@ createFolder(paste0(plotFolder, "/", plotSigmaFolder))
 # betaS <- params$dgp$grid$betaS[iCond]
 # sampleSeed <- grid$sampleSeed[iCond]
 
-##### measurement model #####
+sigmaList <- vector(mode = "list", dim(grid)[1])
+
 # ... always simulate nGroups = 2 in every condition but keep parameters identical! 
 for (iCond in seq_len(dim(grid)[1])) {
   
@@ -117,6 +119,8 @@ for (iCond in seq_len(dim(grid)[1])) {
   # calculate model implied covariance matrix for ...
   #     simulating from SEM by sampling from multivariate normal distribution 
   sigmaSEM <- getSigma(lambdaSEM, betaSEM, covSEM, thetaSEM)
+  
+  sigmaList[[iCond]] <- sigmaSEM
   
   # generate mean vector for data sampling
   # simulate group-outcome correlations by mean differences in the outcome
@@ -190,3 +194,8 @@ for (iCond in seq_len(dim(grid)[1])) {
   #                         params$dgp$grid$R2 == 0.3), ]
 }
 
+names(sigmaList) <- paste0("simData_MIvio", grid$MIvio, "_miItems", grid$miItems, 
+                           "_P", grid$P, "_Q1_cAlpha", grid$cAlpha, "_varT", grid$varT, 
+                           "_corGO", grid$corGO, "_R2", grid$R2)
+createFolder("results/dependentMeasures")
+save(sigmaList, file = paste0("results/dependentMeasures/modelImpliedCovariancesPerCondition.rda"))
