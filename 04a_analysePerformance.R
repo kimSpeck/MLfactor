@@ -181,10 +181,19 @@ for (iMI in unique(diffSub2$MIvio)) {
       ci = 0.95,
       verbose = TRUE)
     
+    # prepare merging of eta results
+    eta2Tmp[,"MLmeth"] <- iOut
+    eta2Tmp[,"MIvio"] <- iMI
+    
     # sort generalized eta-squared results
     # which higher order interactions do we need to illustrate to report simulation results?
     (eta2Tmp.ordered <- eta2Tmp[order(eta2Tmp$Eta2_generalized, decreasing = T),])
     
+    # produce more results with these objects within this script later (paper tables, ...)
+    etaObjectName <- paste0("eta2_", iMI, "_", iOut)
+    assign(etaObjectName, eta2Tmp.ordered)
+    
+    # produce overview plots for every ANOVA (combination of MLmeth x MIvio) 
     eta2Thresh <- 0.05
     plotEta2Tmp <- eta2Tmp.ordered[eta2Tmp.ordered$Eta2_generalized > eta2Thresh,]
     
@@ -222,3 +231,89 @@ for (iMI in unique(diffSub2$MIvio)) {
     
   }
 }
+
+##### eta2 table #####
+# build tables of results for the paper
+#   with results for different ANOVAs from the same prediction method but different
+#   MIvios next to each other
+# eta2res <- ls(pattern = "eta2_") # check objects that match the pattern
+eta2List <- lapply(grep("eta2_", ls(), value = TRUE), get)
+eta2Table <- do.call(rbind, eta2List)
+
+eta2Table <- tidyr::pivot_wider(eta2Table[,c("Parameter", "Eta2_generalized", "MLmeth", "MIvio")], 
+                                names_from = c(MLmeth, MIvio),  
+                                values_from = Eta2_generalized,
+                                names_sep = "_")
+
+# do not remove variables below a certain threshold
+eta2Thresh <- 0.05
+
+# generate sorted tables for different subsets of ANOVA results
+for (iMLmeth in unique(outVec)){
+  idx <- stringr::str_detect(colnames(eta2Table), iMLmeth)
+  idx[1] <- TRUE  
+  
+  TMPeta2 <- eta2Table[,idx]
+  
+  # sort
+  TMPeta2$thresh <- apply(TMPeta2[,!(colnames(TMPeta2) %in% "Parameter")], 1, 
+                            function(r) any(r >= eta2Thresh))
+  TMPeta2$sumEta2 <- apply(TMPeta2[,!(colnames(TMPeta2) %in% c("Parameter", "thresh"))], 1, sum)
+  TMPeta2$M <- apply(TMPeta2[,!(colnames(TMPeta2) %in% c("Parameter", "thresh", "sumEta2"))], 1, mean)
+  TMPeta2 <- dplyr::arrange(TMPeta2, desc(M))
+  
+  colnames(TMPeta2)
+  texTable <- TMPeta2[TMPeta2$thresh == TRUE,!(colnames(TMPeta2) %in% c("thresh", "sumEta2", "M"))]
+  orderCols <- c("Parameter", paste0(iMLmeth, "_specific"), 
+                 paste0(iMLmeth, "_scalar"), paste0(iMLmeth, "_metric"))
+  texTable <- texTable[, orderCols]
+  
+  # formating: round to two
+  idxNum <- stringr::str_detect(colnames(texTable), iMLmeth)
+  texTable[idxNum] <- lapply(texTable[idxNum], function(x) sprintf("%.2f", x))
+  
+  # remove leading zero for numbers in (-1,1)
+  drop0 <- function(s) {
+    gsub("^(-?)0\\.", "\\1.", s) 
+  }
+  texTable[idxNum] <- lapply(texTable[idxNum], drop0)
+  
+  print(xtable::xtable(texTable, type = "latex"),
+        file = paste0(plotFolder, "/ANOVA/betweenANOVA_", iMLmeth,"_", eta2Thresh, ".tex"), 
+        include.rownames = FALSE, sanitize.text.function = identity)
+}
+
+# table with LM and ENET next to each other
+idx <- !(stringr::str_detect(colnames(eta2Table), "Ridge"))
+TMPeta2 <- eta2Table[,idx]
+
+# sort
+TMPeta2$thresh <- apply(TMPeta2[,!(colnames(TMPeta2) %in% "Parameter")], 1, 
+                        function(r) any(r >= eta2Thresh))
+TMPeta2$sumEta2 <- apply(TMPeta2[,!(colnames(TMPeta2) %in% c("Parameter", "thresh"))], 1, sum)
+TMPeta2$M <- apply(TMPeta2[,!(colnames(TMPeta2) %in% c("Parameter", "thresh", "sumEta2"))], 1, mean)
+TMPeta2 <- dplyr::arrange(TMPeta2, desc(M))
+
+colnames(TMPeta2)
+texTable <- TMPeta2[TMPeta2$thresh == TRUE,!(colnames(TMPeta2) %in% c("thresh", "sumEta2", "M"))]
+orderCols <- c("Parameter", paste0("diff_ENET", "_specific"), 
+               paste0("diff_ENET", "_scalar"), paste0("diff_ENET", "_metric"),
+               paste0("diff_LM", "_specific"), 
+               paste0("diff_LM", "_scalar"), paste0("diff_LM", "_metric"))
+texTable <- texTable[, orderCols]
+
+# formating: round to two
+idxNum <- !(stringr::str_detect(colnames(texTable), "Parameter"))
+texTable[idxNum] <- lapply(texTable[idxNum], function(x) sprintf("%.2f", x))
+
+# remove leading zero for numbers in (-1,1)
+drop0 <- function(s) {
+  gsub("^(-?)0\\.", "\\1.", s) 
+}
+texTable[idxNum] <- lapply(texTable[idxNum], drop0)
+
+print(xtable::xtable(texTable, type = "latex"),
+      file = paste0(plotFolder, "/ANOVA/betweenANOVA_", "ENET_LM","_", eta2Thresh, ".tex"), 
+      include.rownames = FALSE, sanitize.text.function = identity)
+
+# ? estimate marginal means for different interaction conditions
