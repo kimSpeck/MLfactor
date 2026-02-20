@@ -105,7 +105,7 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
                                                  # fixed fold IDs for training and testing
                                                  index = indexTrainCV,
                                                  indexOut = indexOutTestCV,
-                                                 # oneSE rule
+                                                 # "best" = min criterion; oneSE rule
                                                  selectionFunction = params$fit$caretCrit,
                                                  search = "grid"), 
                         tuneGrid = tmpTuneGrid, #setting the tuning grid
