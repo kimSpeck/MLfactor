@@ -173,7 +173,7 @@ params$dgp$varG = 0.25 # variance of a binary grouping variable with p = 0.5
 params$dgp$meanG = 0.5 # expected value of a binary grouping variable with p = 0.5
 
 ##### structure model #####
-params$dgp$R2 <- c(0.3, 0.8) # how much variance should be explained in the outcome
+params$dgp$R2 <- c(0, 0.3, 0.8) # how much variance should be explained in the outcome
 # params$dgp$R2 <- c(0.2, 0.4, 0.6) 
 # correlation between the grouping variable and the outcome
 params$dgp$rGroupOut <- c(0, 0.2, 0.5)
