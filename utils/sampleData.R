@@ -23,8 +23,8 @@ sampleData <- function() {
     }
     
     # simulate data + save parameter checks
-    checkFlag <- FALSE 
-    # if (checkFlag) {N <- 20000}
+    checkFlag <- TRUE 
+    if (checkFlag) {N <- 20000}
     
     # simulate date from multivariate normal distribution
     # if we have this block matrix structure we only need N/nGroups observations
@@ -93,6 +93,10 @@ sampleData <- function() {
         # vector of estimated factor loadings (= flT)
         lambda_hat <- fit_singleGroup@Model@GLIST$lambda[seq_len(length(itemNames)),1]
         
+        # vector of standardized factor loadings (= flT.std)
+        fl.std <- subset(standardizedSolution(fit_singleGroup), op == "=~")  # returns a data.frame
+        flT.std <- subset(fl.std, lhs == "T", select = est.std)
+        
         # residual variances of the items (= varS + varE)
         theta_hat <- diag(fit_singleGroup@Model@GLIST$theta)[seq_len(length(itemNames))]
         
@@ -112,12 +116,12 @@ sampleData <- function() {
         # check Cronbach's Alpha
         cAlpha_semTools <- semTools::reliability(fit_singleGroup)["alpha",]
         
-        list(lambda_hat = lambda_hat, theta_hat = theta_hat, sigmaEy_hat = sigmaEy_hat, 
-             R2_itemsT = R2_itemsT, betaT_hat = betaT_hat, R2_hat = R2_hat, 
-             cAlpha_semTools = cAlpha_semTools)
+        list(lambda_hat = lambda_hat, flT.std = flT.std, theta_hat = theta_hat, 
+             sigmaEy_hat = sigmaEy_hat, R2_itemsT = R2_itemsT, betaT_hat = betaT_hat, 
+             R2_hat = R2_hat, cAlpha_semTools = cAlpha_semTools)
       }, error = function(e) {
-        list(lambda_hat = rep(NA, P), theta_hat = rep(NA, P), sigmaEy_hat = NA, 
-             R2_itemsT = rep(NA, P), betaT_hat = NA, R2_hat = NA, 
+        list(lambda_hat = rep(NA, P), flT.std = rep(NA, P), theta_hat = rep(NA, P), 
+             sigmaEy_hat = NA, R2_itemsT = rep(NA, P), betaT_hat = NA, R2_hat = NA, 
              cAlpha_semTools = NA)
       })
       
@@ -165,6 +169,7 @@ sampleData <- function() {
                         # vectors
                         var_hat = var_hat,
                         lambda_hat = outSEM[["lambda_hat"]],
+                        flT.std = outSEM[["flT.std"]],
                         theta_hat = outSEM[["theta_hat"]], 
                         R2_itemsT = outSEM[["R2_itemsT"]],
                         # scalars
