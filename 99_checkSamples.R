@@ -73,22 +73,26 @@ for (iFolder in seq_len(length(conditionFolders))) {
   sampleStats[[iFolder]] <- tmpMat
   
   # construct results matrix for vectors of values describing the sample
-  #   factor loadinds, residual variances, variances of manifest variables, R² of items (by factor)
-  tmpMat <- matrix(NA, ncol = 18, nrow = 4)
+  #   factor loadings, standardized factor loadings, residual variances, variances of manifest variables, R² of items (by factor)
+  tmpMat <- matrix(NA, ncol = 18, nrow = 5)
   tmpMat[1, ] <- c(unlist(conditionVars), "lambda", params$dgp$grid[condVec[1], "flT"],
                    if (conditionVars["P"] == 4) {
                      c(data[[1]][["lambda_hat"]], rep(NA, 4))
                      } else {data[[1]][["lambda_hat"]]})
-  tmpMat[2, ] <- c(unlist(conditionVars), "theta", 
+  tmpMat[2, ] <- c(unlist(conditionVars), "lambda.std", 0,
+                   if (conditionVars["P"] == 4) {
+                     c(t(data[[1]][["flT.std"]]), rep(NA, 4))
+                   } else {t(data[[1]][["flT.std"]])})
+  tmpMat[3, ] <- c(unlist(conditionVars), "theta", 
                    params$dgp$grid[condVec[1], "varStable"] + params$dgp$grid[condVec[1], "varE"],
                    if (conditionVars["P"] == 4) {
                      c(data[[1]][["theta_hat"]], rep(NA, 4))
                    } else {data[[1]][["theta_hat"]]})
-  tmpMat[3, ] <- c(unlist(conditionVars), "varItems", params$dgp$varItems,
+  tmpMat[4, ] <- c(unlist(conditionVars), "varItems", params$dgp$varItems,
                    if (conditionVars["P"] == 4) {
                      c(data[[1]][["var_hat"]][itemNames], rep(NA, 4))
                    } else { data[[1]][["var_hat"]][itemNames]})
-  tmpMat[4, ] <- c(unlist(conditionVars), "R2_itemsT", 
+  tmpMat[5, ] <- c(unlist(conditionVars), "R2_itemsT", 
                    params$dgp$grid[condVec[1], "flT"]**2 * params$dgp$grid[condVec[1], "varT"],
                    if (conditionVars["P"] == 4) {
                      c(data[[1]][["R2_itemsT"]], rep(NA, 4))
@@ -115,7 +119,7 @@ sampleStats$miItemsPlot <- ifelse(sampleStats$miItems %in% c(2, 4), "P/2", sampl
 # 16 out of 432 is fine; ignore NAs and still draw valie conclusions regarding sanity checks 
 naIdx <- which(apply(sampleStats, 1, anyNA))
 length(naIdx) 
-View(sampleStats[naIdx,])
+# View(sampleStats[naIdx,])
 ################################################################################
 # check simulation parameters 
 ################################################################################
@@ -264,6 +268,7 @@ ggplot(variableStats[variableStats$miItems == "0" &
   geom_jitter()
 
 
+
 # lambda
 ggplot(variableStats[variableStats$miItems == "0" &
                        variableStats$measure == "lambda", ], 
@@ -286,3 +291,112 @@ ggplot(variableStats[variableStats$miItems == "0" &
        aes(x = cAlpha, y = diff, group = interaction(P, R2), 
            color = interaction(P, R2), fill = interaction(P, R2))) +
   geom_jitter()
+
+# examine standardized factor loadings
+variableStats$miItemsLevels <- ifelse(variableStats$miItems > 1, 2, variableStats$miItems)
+variableStats$MIvio <- factor(variableStats$MIvio, 
+                              levels = c("metric", "scalar", "specific", "nuanceFactor"), 
+                              labels = c("metric", "scalar", "nuance", "nuanceFactor"))
+ggplot(variableStats[variableStats$measure == "lambda.std", ], 
+       aes(x = miItemsLevels, y = mean, group = P, 
+           color = P, shape = P)) +
+  geom_jitter() + 
+  facet_grid(cAlpha ~  MIvio)
+
+# long format of items
+stdLambdaSub <- variableStats[variableStats$measure == "lambda.std", ]
+Xcols <- grep("^X\\d+$", names(stdLambdaSub), value = TRUE)
+stdLambdaSub_long <- tidyr::pivot_longer(stdLambdaSub, Xcols, 
+                                         names_to = "item", values_to = "flT.std")
+stdLambdaSub_long$manipulated <- ifelse(as.numeric(stdLambdaSub_long$miItems) > 0 &
+                                          as.numeric(substr(stdLambdaSub_long$item, 2, 2)) > 
+                                          as.numeric(stdLambdaSub_long$P) - as.numeric(stdLambdaSub_long$miItems), 1, 0)
+
+unique(stdLambdaSub_long$manipulated)
+stdLambdaSub_long$manipulated <- factor(stdLambdaSub_long$manipulated)
+stdLambdaSub_long$miItemsLevels <- factor(stdLambdaSub_long$miItemsLevels, 
+                                          levels = c(0, 1, 2), 
+                                          labels = c("0", "1", "50%"))
+
+(stdFL_perItem <- ggplot(stdLambdaSub_long, 
+       aes(x = miItemsLevels, y = flT.std, group = P, 
+           color = manipulated, shape = P, fill = manipulated)) +
+  geom_jitter() + 
+  facet_grid(cAlpha ~  MIvio) + 
+  scale_color_manual(values = c("#D55E00", "#0072B2")) + 
+  scale_y_continuous(breaks = scales::breaks_width(0.1)) +
+  ylab("Standardized Factor Loadings") +
+  xlab("Number of Manipulated Items"))
+
+themeFunctionPaper <- function(plotObject, guides = T){
+  pTmp <- plotObject + theme(
+    panel.grid.major = element_line(linewidth = 0.15, linetype = 'solid', color = "lightgrey"), 
+    panel.grid.minor = element_line(linewidth = 0.1, linetype = 'solid', color = "lightgrey"),
+    panel.background = element_rect(color = "white", fill = "white"),
+    plot.title = element_text(size = 30, face = "bold"),
+    axis.text.y = element_text(size = 20),
+    axis.text.x = element_text(size = 20),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20),
+    strip.text.x = element_text(size = 15),
+    strip.text.y = element_text(size = 15),
+    #legend.position = c(.85, .39), 
+    legend.position = "bottom", 
+    legend.title = element_text(size = 25),
+    legend.text = element_text(size = 20),
+    legend.key.width = unit(2, "cm"),
+    legend.box = "horizontal")
+  if (guides == F) {
+    pTmp <- pTmp + guides(color = "none", shape = "none", linetype = "none")
+  }
+  return(pTmp)
+}
+
+(stdFL_perItem <- themeFunctionPaper(stdFL_perItem))
+ggplot2::ggsave(filename = paste0("plots", "/stdFactorLoadings_perItem_appendix.png"),
+                plot = stdFL_perItem,
+                width = 11.66,
+                height = 9.12,
+                units = "in")
+
+
+# mean for MI manipulated vs. unmanipulated items 
+stdLambdaSub <- variableStats[variableStats$measure == "lambda.std", ]
+Xcols <- grep("^X\\d+$", names(stdLambdaSub), value = TRUE)
+get_means <- function(P, miItems, data) {
+  
+  P <- as.integer(P); miItems <- as.integer(miItems)
+  
+  if (miItems == 0) {
+    manip_idx   <- c(integer(0))
+    unmanip_idx <- c(paste0("X", 1:P))
+  } else if (miItems == 1) {
+    manip_idx   <- c(paste0("X", P))
+    unmanip_idx <- c(paste0("X", 1:(P-1)))
+  } else { # m > 1
+    manip_idx   <- c(paste0("X", (P - miItems + 1):P))
+    unmanip_idx <- c(paste0("X", 1:(P - miItems)))
+  }
+  
+  manip_mean   <- if (length(manip_idx)   == 0) NA_real_ else mean(data[manip_idx],   na.rm = TRUE)
+  unmanip_mean <- if (length(unmanip_idx) == 0) NA_real_ else mean(data[unmanip_idx], na.rm = TRUE)
+  
+  c(manip = manip_mean, unmanip = unmanip_mean)
+}
+
+res <- t(mapply(
+  FUN = get_means,
+  P = stdLambdaSub$P,
+  miItems = stdLambdaSub$miItems,
+  data = stdLambdaSub)
+)
+
+stdLambdaSub$manipulated <- res[,"manip"]
+stdLambdaSub$unManipulated <- res[,"unmanip"]
+
+# varT and R2 without any influence
+ggplot(variableStats[variableStats$measure == "lambda.std", ], 
+       aes(x = miItemsLevels, y = mean, group = P, 
+           color = P, shape = P, fill = manipulated)) +
+  geom_jitter() + 
+  facet_grid(cAlpha ~  MIvio)
