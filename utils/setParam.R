@@ -86,8 +86,12 @@ getBy <- function(R2, sigmaEy, varT, cAlpha, nFactors = 1) {
   return(sqrt( (R2 * sigmaEy) / (varT * (1 - R2))))
 }
 
-
-
+getCovNuance <- function(targetR, varS) {
+  if (any(is.na(c(targetR, varS)))) stop("Inputs must not be NA.")
+  if (varS < 0) stop("Variance must be non-negative.")
+  if (targetR < -1 || targetR > 1) stop("Correlation targetR must be in [-1, 1].")
+  targetR * sqrt(varS * varS)
+}
 ################################################################################
 # simulation design 
 ################################################################################
@@ -293,6 +297,24 @@ params$dgp$grid$betaS <- ifelse(params$dgp$grid$MIvio != "specific", 0, params$d
 # # I don't need the nGroups parameter since I always simulate two groups but with identical parameter values 
 #   if the true DGP has only one group
 # params$dgp$varFLgrid$nGroups <- ifelse(params$dgp$varFLgrid$MIvio == "specific", 1, params$dgp$nGroups)
+
+# add condition with correlations between item-specific variance (only for nuance condition "specific")
+# this manipulation is only meaningful if miItems > 1
+# unique(params$dgp$grid$miItems)
+duplicate <- params$dgp$grid[params$dgp$grid$MIvio == "specific" &
+                               params$dgp$grid$miItems > 1, ]
+duplicate$MIvio <- "nuanceFactor"
+params$dgp$grid <- rbind(params$dgp$grid, duplicate)
+rm(duplicate)
+
+params$dgp$MIvio <- unique(params$dgp$grid$MIvio)
+params$dgp$corNuanceFactor <- .5 
+params$dgp$grid$covNuanceFactor <- sapply(seq_len(dim(params$dgp$grid)[1]), function(iRow) {
+  return(ifelse(params$dgp$grid$MIvio[iRow] == "nuanceFactor", 
+         getCovNuance(targetR = params$dgp$corNuanceFactor, 
+                      varS = params$dgp$grid$varS[iRow]), 0))
+})
+
 
 # create seed number for parallel cluster (reproducibility of generated data)
 #   keep seeds from simulating only linear effects and only add nonlinear conditions with seed
