@@ -149,7 +149,7 @@ defineLambda <- function(flT, flS = 1, nGroups, nItems,
 } 
 
 definePhi <- function(nLatentSEM, varT, varStable, varS, nItems, MIvio = F, miItems = 0, 
-                      varNames = NULL, nFactors = 1) {
+                      covNuanceFactor = 0, varNames = NULL, nFactors = 1) {
   ###
   # define factor correlation matrix
   ## input:
@@ -180,12 +180,13 @@ definePhi <- function(nLatentSEM, varT, varStable, varS, nItems, MIvio = F, miIt
   # }
   
   
-  if (!MIvio) {
+  # if (!MIvio) { # specific or nuance
+  if (MIvio %in% c("specific", "nuanceFactor")) {
     phi <- diag(nLatentSEM) * c(rep(c(varT, rep(varS, nItems)), times = params$dgp$nGroups),  
                                 # rep(params$dgp$sigmaEy, params$dgp$nOutcome))
                                 rep(params$dgp$sigmaEy, params$dgp$nOutcome * params$dgp$nGroups))
                                 
-  } else {
+  } else { # scalar or metric MI violations 
     phi <- diag(nLatentSEM) * c(
       # true factor with true factor variance, 
       rep(rep(c(varT, varStable, varS), c(nFactors, nItems-miItems, miItems)), times = params$dgp$nGroups),  
@@ -197,8 +198,24 @@ definePhi <- function(nLatentSEM, varT, varStable, varS, nItems, MIvio = F, miIt
     colnames(phi) <- rownames(phi) <- varNames
   }
   
+  if (MIvio == "nuanceFactor") {
+    miVars_g1 <- paste0("S", (nItems-miItems+1):nItems, "_g1")
+    miVars_g2 <- paste0("S", (nItems-miItems+1):nItems, "_g2")
+    
+    pairs <- rbind(expand.grid(v1 = miVars_g1, v2 = miVars_g1, stringsAsFactors = FALSE),
+                  expand.grid(v1 = miVars_g2, v2 = miVars_g2, stringsAsFactors = FALSE))
+    pairs <- pairs[pairs$v1 != pairs$v2, ]  # drop self-pairs
+    
+    # pairs <- rbind(t(combn(miVars_g1, 2)), t(combn(miVars_g2, 2))) 
+    for (iRow in seq_len(dim(pairs)[1])) {
+      phi[pairs[iRow,1], pairs[iRow,2]] <- covNuanceFactor
+    }
+  }
+  
   phi
 }
+
+
 
 # Creates a diagonal residual matrix of size nItems*nGroups + nOutcome
 #   ... residuals of the outcome are zero as we use all latent formulation here 
