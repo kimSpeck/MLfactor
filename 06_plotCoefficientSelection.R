@@ -111,21 +111,81 @@ for (iP in pVec) {
   }
 }
 
-# Item 4 is the one with the manipulation
-colVec <- c( "#006400", "#FF7F50", "#B22222") 
-ggplot(testSub[testSub$MIvio == "metric" &
-                  testSub$predSet == "items",], 
-       aes(x = X1, y = X4, group = N, 
-           color = N)) +
-  #geom_abline(intercept = 0, slope = 0, "black", alpha = 0.5) +
-  #geom_errorbar(aes(ymin = M - 2*SD, ymax = M + 2*SD), alpha = 0.2, width = 0.1) + 
-  geom_point(size = 1.5, alpha = 0.5) +
-  #geom_line(alpha = 0.4, linewidth = 0.75) +
-  #scale_shape_manual(values = shapeVec) +
-  scale_color_manual(values = colVec) +
-  #scale_linetype_manual(values = lineTypeVec) +
-  #ylab(paste0("difference in ", iMT, " (items - LM score)")) +
-  facet_wrap(~ cAlpha + corGO)
+##### plot one presentation plot #####
+nMIitems = c(0, 1, 2)[2]
+
+subTmp <- coef_pDiffSub[coef_pDiffSub$P == 4 &
+                          coef_pDiffSub$R2 == 0.8 &
+                          coef_pDiffSub$predSet == "items" &
+                          coef_pDiffSub$miItems == 1 &
+                          coef_pDiffSub$corGO != 0.2 &
+                          coef_pDiffSub$coefficient != "intercept",] 
+
+
+colVec <- c(itemCol[seq_len(as.numeric(4) - nMIitems)], 
+            miCol[seq_len(nMIitems)])
+
+pTmp <- ggplot(subTmp, 
+               aes(x = model, y = value, fill = coefficient, color = coefficient)) +
+  coord_flip() + 
+  geom_violinhalf(width=2.1, alpha = 0.5) +
+  xlab("") +
+  ylab("Regression Coefficients") +
+  scale_color_manual(values = colVec) + 
+  scale_fill_manual(values = colVec) +
+  geom_abline(intercept = 0, slope = 0, "black", alpha = 0.5) +
+  #geom_vline(aes(xintercept = 0), color = "black", alpha = 0.5) +
+  facet_grid(corGO ~ MIvio)
+
+pTmp <- themeFunctionPaper(pTmp)
+
+ggplot2::ggsave(filename = paste0(plotFolder, "/present/pCoef_P4", "_MIitems", 
+                                  nMIitems, "_items.png"),
+                plot = pTmp,
+                width = 13.63,
+                height = 12.07,
+                units = "in")
+
+subTmp <- coef_pDiffSub[coef_pDiffSub$P == 4 &
+                          coef_pDiffSub$R2 == 0.8 &
+                          coef_pDiffSub$predSet == "comb" &
+                          coef_pDiffSub$miItems == 1 &
+                          coef_pDiffSub$corGO != 0.2 &
+                          coef_pDiffSub$coefficient != "intercept",] 
+
+colVec <- c(itemCol[seq_len(as.numeric(4) - nMIitems)], 
+            miCol[seq_len(nMIitems)],
+            scoreCol)  
+
+pTmp <- ggplot(subTmp, 
+               aes(x = model, y = value, fill = coefficient, color = coefficient)) +
+  coord_flip() + 
+  geom_violinhalf(width=2.1, alpha = 0.5) +
+  xlab("") +
+  ylab("Regression Coefficients") +
+  scale_color_manual(values = colVec) + 
+  scale_fill_manual(values = colVec) +
+  geom_abline(intercept = 0, slope = 0, "black", alpha = 0.5) +
+  #geom_vline(aes(xintercept = 0), color = "black", alpha = 0.5) +
+  facet_grid(corGO ~ MIvio)
+
+pTmp <- themeFunctionPaper(pTmp)
+
+# # Item 4 is the one with the manipulation
+# colVec <- c( "#006400", "#FF7F50", "#B22222") 
+# ggplot(testSub[testSub$MIvio == "metric" &
+#                   testSub$predSet == "items",], 
+#        aes(x = X1, y = X4, group = N, 
+#            color = N)) +
+#   #geom_abline(intercept = 0, slope = 0, "black", alpha = 0.5) +
+#   #geom_errorbar(aes(ymin = M - 2*SD, ymax = M + 2*SD), alpha = 0.2, width = 0.1) + 
+#   geom_point(size = 1.5, alpha = 0.5) +
+#   #geom_line(alpha = 0.4, linewidth = 0.75) +
+#   #scale_shape_manual(values = shapeVec) +
+#   scale_color_manual(values = colVec) +
+#   #scale_linetype_manual(values = lineTypeVec) +
+#   #ylab(paste0("difference in ", iMT, " (items - LM score)")) +
+#   facet_wrap(~ cAlpha + corGO)
 
 # Does ENET or itemENET keep items with MI violations or specific effects more often 
 #   than without manipulation? 
