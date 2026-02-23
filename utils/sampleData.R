@@ -23,7 +23,7 @@ sampleData <- function() {
     }
     
     # simulate data + save parameter checks
-    checkFlag <- TRUE 
+    checkFlag <- FALSE
     if (checkFlag) {N <- 20000}
     
     # simulate date from multivariate normal distribution

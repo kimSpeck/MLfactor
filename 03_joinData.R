@@ -8,7 +8,8 @@ source("utils/utilityFUNS.R")
 # source("utils/fitTools.R")
 library(tidyverse)
 
-resFolder <- "results"
+# resFolder <- "results"
+resFolder <- "extraResults"
 depFolder <- "dependentMeasures"
 createFolder(paste0(resFolder, "/", depFolder))
 

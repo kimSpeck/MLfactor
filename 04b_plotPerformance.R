@@ -6,12 +6,16 @@ source("utils/utilityFUNS.R")
 
 library(tidyverse)
 
-resFolder <- "results"
+# test it
+# resFolder <- "results"
+resFolder <- "extraResults"
 depFolder <- "dependentMeasures"
 
 plotFolder <- "plots"
 createFolder(plotFolder)
-plotPerformanceFolder <- "performance"
+# test it
+# plotPerformanceFolder <- "performance"
+plotPerformanceFolder <- "performanceExtra"
 createFolder(paste0(plotFolder, "/", plotPerformanceFolder))
 
 resFile <- paste0(resFolder, "/", depFolder, "/performStats.rda")
