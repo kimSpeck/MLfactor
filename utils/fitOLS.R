@@ -1,7 +1,7 @@
 # fit linear regression with cross-validation to evaluate identical performance 
 #     measures for different models and avoid overfitting
 
-fitOLS <- function(trainData, testData, foldid) {
+fitOLS <- function(trainData, testData, foldid, group = F) {
   
   # # test it
   # trainData <- dataSubset
@@ -19,7 +19,13 @@ fitOLS <- function(trainData, testData, foldid) {
   # fit only items, only scores, fit items + scores
   # ... implement this by different vectors of variable names
   itemNames <- colnames(trainData)[stringr::str_detect(colnames(trainData), "^X[:digit:]+")]
-  trainPredSets <- list(itemNames, "score", c(itemNames, "score"))
+  if (group) {
+    trainPredSets <- list(itemNames, "score", c(itemNames, "score"),
+                        c(itemNames, "group"), c("group", "score"), 
+                        c(itemNames, "group", "score"))
+  } else {
+    trainPredSets <- list(itemNames, "score", c(itemNames, "score"))
+  }
   
   # # test it 
   # iPredSet <- trainPredSets[[3]]
@@ -122,9 +128,12 @@ fitOLS <- function(trainData, testData, foldid) {
     #       ... all simulated conditions (P = {4, 8}) 
     #       ... and all datasets/feature sets used for fitting the model
     # coefMat <- matrix(rep(NA_real_, (1 + max(params$dgp$P) + max(params$dgp$Q)) * 2), nrow = 2) # with SE
-    coefMat <- matrix(rep(NA_real_, (1 + max(params$dgp$P) + max(params$dgp$Q))), nrow = 1) # without SE
+    coefMat <- matrix(rep(NA_real_, (1 + max(params$dgp$P) + 
+                                       (max(params$dgp$nGroups)-1) + 
+                                       max(params$dgp$Q))), nrow = 1) # without SE
     colnames(coefMat) <- c("(Intercept)", 
                            paste0("X", seq_len(max(params$dgp$P))), 
+                           rep("group", (max(params$dgp$nGroups)-1)),
                            rep("score", max(params$dgp$Q)))
     
     # fill in regression coefficients

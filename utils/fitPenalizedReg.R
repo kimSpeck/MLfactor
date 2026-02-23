@@ -7,7 +7,7 @@
 #       thus, scores have to be included in the model and only deviations from 
 #             score-based predictions are represented in items 
 
-fitRegReg <- function(trainData, testData, foldid, regMode) {
+fitRegReg <- function(trainData, testData, foldid, regMode, group = F) {
   
   # # test it
   # trainData <- dataSubset
@@ -31,22 +31,29 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
     # one predictor model does not work with glmnet
     #     for one predictor, shrinkage 
     #     glmnet: "Error: x should be a matrix with 2 or more columns"
-    trainPredSets <- list(itemNames, c(itemNames, "score"))  
+      
+    if (group) {
+      trainPredSets <- list(itemNames, c(itemNames, "score"), 
+                            c(itemNames, "group"), c(itemNames, "group", "score"))
+      
+    } else {
+      trainPredSets <- list(itemNames, c(itemNames, "score"))
+    }
     
     # create penaltyFactor vector for these conditions (with only defaultValue)
     #   inside the lapply()-function that iterates over predictor sets instead of 
     #   saving a list of penaltyFactor vectors with all predictor sets
   } else { # fit only item + scores for regMode = itemENET
-    trainPredSets <- list(c(itemNames, "score"))
     
-    # automatically set the penalty factor that controls regularization of only items
-    # penalty factor = vector of length nPredictors in data (excluding intercept; intercept never penalized)
-    # default penalization: 1; unpenalized features: 0
-    #   Unpenalized features are still estimated jointly, so their coefficients can 
-    #   change with lambda because the penalized part of the model changes; they’re just not directly shrunk.
-    penaltyFactor <- c(rep(params$fit$defaultPenalty, length(itemNames)), 
-                       rep(params$fit$noPenalty,  params$dgp$Q))
-    names(penaltyFactor) <- c(itemNames, "score")
+    if (group) {
+      trainPredSets <- list(c(itemNames, "score"), 
+                            c(itemNames, "group", "score"))
+      
+    } else {
+      trainPredSets <- list(c(itemNames, "score"))
+      
+    }
+    
   }
   
   # # test it 
@@ -58,9 +65,20 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
     # print(modelSyntax)
     
     # here: produce list with penalty factor = default penalty with respective predictor set length
-    if (regMode != "itemENET") { # for itemENET penaltyFactor vector already exists
+    if (regMode != "itemENET") { 
       penaltyFactor <- rep(params$fit$defaultPenalty, length(iPredSet))
       names(penaltyFactor) <- c(iPredSet) # match names to trainPredSet
+    
+    } else {
+      # automatically set the penalty factor that controls regularization of only items
+      # penalty factor = vector of length nPredictors in data (excluding intercept; intercept never penalized)
+      # default penalization: 1; unpenalized features: 0
+      #   Unpenalized features are still estimated jointly, so their coefficients can 
+      #   change with lambda because the penalized part of the model changes; they’re just not directly shrunk.
+      # here!
+      penaltyFactor <- c(rep(params$fit$defaultPenalty, (length(iPredSet)-params$dgp$Q)), 
+                         rep(params$fit$noPenalty,  params$dgp$Q))
+      names(penaltyFactor) <- c(iPredSet)
     }
     
     # tuning grid depending on regMode
@@ -115,7 +133,7 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
     #   those are the same values as the resamples()-function gives back for the models
     #   therefore this is the result, on which the limits of the DDM should be evaluated
     performCVtest <- matrix(unlist(fit$results[rownames(fit$results) == rownames(fit$bestTune), 
-                                       c("RMSE", "Rsquared", "MAE")]), , ncol = 3, nrow = 1)
+                                       c("RMSE", "Rsquared", "MAE")]), ncol = 3, nrow = 1)
     
     # standardize and center full training and full test for refitting model on 
     #     full data and test performance!
@@ -143,9 +161,12 @@ fitRegReg <- function(trainData, testData, foldid, regMode) {
     #       ... all simulated conditions (P = {4, 8}) 
     #       ... and all datasets/feature sets used for fitting the model
     # coefMat <- matrix(rep(NA_real_, (1 + max(params$dgp$P) + max(params$dgp$Q)) * 2), nrow = 2) # with SE
-    coefMat <- matrix(rep(NA_real_, (1 + max(params$dgp$P) + max(params$dgp$Q))), nrow = 1) # without SE
+    coefMat <- matrix(rep(NA_real_, (1 + max(params$dgp$P) + 
+                                       (max(params$dgp$nGroups)-1) + 
+                                       max(params$dgp$Q))), nrow = 1) # without SE
     colnames(coefMat) <- c("(Intercept)", 
                            paste0("X", seq_len(max(params$dgp$P))), 
+                           rep("group", (max(params$dgp$nGroups)-1)),
                            rep("score", max(params$dgp$Q)))
     
     # extract coefficients of the final model

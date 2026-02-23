@@ -72,6 +72,8 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
   s <- .Random.seed
   clusterSetRNGStream(cl = cl, iseed = s)
   
+  # # test it
+  # iSim <- 73
   # file name for all samples in one big rda file or folder name for single sample rda files
   conditionFolder <- paste0("simData_MIvio", grid$MIvio[iSim], "_miItems", grid$miItems[iSim], 
                      "_P", grid$P[iSim], "_Q", grid$Q[iSim], "_cAlpha", grid$cAlpha[iSim], 
@@ -98,7 +100,6 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
     testSample <- loadRData(paste0(dataFolder, "/", conditionFolder, "/sample_test1.rda"))
     
     # lapply over different conditions of sample sizes
-    # test it!
     estN <- lapply(seq_along(params$dgp$trainN), function(iN) { 
       
       # random sampling from training sample (reproducible?)
@@ -130,42 +131,78 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
       # ... fit data on training sample
       # ... fit different datasets within every fit function {onlyItems, onlyScores, Items + Score}
       # ... test fit model on holdout data within fit function
-      modelList <- vector(mode = "list", length = 4)
+      modelList <- vector(mode = "list", length = 8)
       names(modelList) <- c("fit_LM", "fit_Ridge", "fit_ENET", "fit_ENETitems")
       
       # linear regression 
       modelList[["fit_LM"]] <- fitOLS(trainData = trainSubset, 
                        testData = testSample,  
-                       foldid = foldid) 
-      
+                       foldid = foldid, group = params$fit$fitGroup) 
+    
       # ridge regression
       modelList[["fit_Ridge"]] <- fitRegReg(trainData = trainSubset,
                              testData = testSample,
-                             foldid = foldid, regMode = "ridge") 
+                             foldid = foldid, regMode = "ridge", group = params$fit$fitGroup) 
       
       # elastic net regression
       modelList[["fit_ENET"]] <- fitRegReg(trainData = trainSubset, 
                             testData = testSample,
-                            foldid = foldid, regMode = "enet") 
-      
+                            foldid = foldid, regMode = "enet", group = params$fit$fitGroup) 
+     
       # elastic net regression only item penalty
       modelList[["fit_ENETitems"]] <- fitRegReg(trainData = trainSubset, 
                                  testData = testSample,
-                                 foldid = foldid, regMode = "itemENET") 
+                                 foldid = foldid, regMode = "itemENET", group = params$fit$fitGroup) 
       
-      list(performVec = cbind(sample = iSample, N = rep(params$dgp$trainN[iN]), 
-            model = rep(c("LM", "Ridge", "ENET", "itemENET"), c(3, 2, 2, 1)),
-            predSet = rep(c("items", "score", "comb", "items", "comb", "items", "comb", "comb")),
-            do.call(rbind, lapply(modelList, `[[`, "performVec"))),
-           # predError = do.call(rbind, lapply(modelList, `[[`, "predError")),
-           regCoef = cbind(sample = iSample, N = rep(params$dgp$trainN[iN]), 
-            model = rep(c("LM", "Ridge", "ENET", "itemENET"), c(3, 2, 2, 1)),
-            predSet = rep(c("items", "score", "comb", "items", "comb", "items", "comb", "comb")),
-            do.call(rbind, lapply(modelList, `[[`, "regCoef"))),
-           hyperParams = cbind(sample = iSample, N = rep(params$dgp$trainN[iN]), 
-            model = rep(c("Ridge", "ENET", "itemENET"), c(2, 2, 1)),
-            predSet = c("items", "comb", "items", "comb", "comb"),
-            do.call(rbind, lapply(modelList, `[[`, "hyperParams"))))
+      if (params$fit$fitGroup) {
+        list(performVec = cbind(sample = iSample, N = rep(params$dgp$trainN[iN]), 
+                                model = rep(c("LM", "Ridge", "ENET", "itemENET"), 
+                                            c(6, 4, 4, 2)),
+                                predSet = c("items", "score", "comb", 
+                                            "items_group", "score_group", "comb_group", 
+                                            "items", "comb", 
+                                            "items_group", "comb_group", 
+                                            "items", "comb",
+                                            "items_group", "comb_group",
+                                            "comb", "comb_group"),
+                                do.call(rbind, lapply(modelList, `[[`, "performVec"))),
+             # predError = do.call(rbind, lapply(modelList, `[[`, "predError")),
+             regCoef = cbind(sample = iSample, N = rep(params$dgp$trainN[iN]), 
+                             model = rep(c("LM", "Ridge", "ENET", "itemENET"), 
+                                         c(6, 4, 4, 2)),
+                             predSet = c("items", "score", "comb", 
+                                         "items_group", "score_group", "comb_group", 
+                                         "items", "comb", 
+                                         "items_group", "comb_group", 
+                                         "items", "comb",
+                                         "items_group", "comb_group",
+                                         "comb", "comb_group"),
+                             do.call(rbind, lapply(modelList, `[[`, "regCoef"))),
+             hyperParams = cbind(sample = iSample, N = rep(params$dgp$trainN[iN]), 
+                                 model = rep(c("Ridge", "ENET", "itemENET"), 
+                                             c(4, 4, 2)),
+                                 predSet = c("items", "comb", 
+                                             "items_group", "comb_group", 
+                                             "items", "comb",
+                                             "items_group", "comb_group",
+                                             "comb", "comb_group"),
+                                 do.call(rbind, lapply(modelList, `[[`, "hyperParams"))))
+      } else { # result object without predictor sets including group as a covariate
+        list(performVec = cbind(sample = iSample, N = rep(params$dgp$trainN[iN]), 
+                                model = rep(c("LM", "Ridge", "ENET", "itemENET"), c(3, 2, 2, 1)),
+                                predSet = rep(c("items", "score", "comb", "items", "comb", "items", "comb", "comb")),
+                                do.call(rbind, lapply(modelList, `[[`, "performVec"))),
+             # predError = do.call(rbind, lapply(modelList, `[[`, "predError")),
+             regCoef = cbind(sample = iSample, N = rep(params$dgp$trainN[iN]), 
+                             model = rep(c("LM", "Ridge", "ENET", "itemENET"), c(3, 2, 2, 1)),
+                             predSet = rep(c("items", "score", "comb", "items", "comb", "items", "comb", "comb")),
+                             do.call(rbind, lapply(modelList, `[[`, "regCoef"))),
+             hyperParams = cbind(sample = iSample, N = rep(params$dgp$trainN[iN]), 
+                                 model = rep(c("Ridge", "ENET", "itemENET"), c(2, 2, 1)),
+                                 predSet = c("items", "comb", "items", "comb", "comb"),
+                                 do.call(rbind, lapply(modelList, `[[`, "hyperParams"))))
+      }
+      
       
     })
     

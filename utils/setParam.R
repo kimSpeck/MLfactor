@@ -325,6 +325,9 @@ params$dgp$grid$sampleSeed <- seedNum[1:dim(params$dgp$grid)[1]]
 ################################################################################
 # model fitting
 ################################################################################
+# fit *additional* models including group as a covariate in the predictor set
+params$fit$fitGroup <- TRUE
+
 ##### Hyperparameter Tuning #####
 params$fit$nfolds <- 10
 
