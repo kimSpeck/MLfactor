@@ -132,3 +132,61 @@ for (iMIvio in unique(plotCorData$MIvio)) {
   }
 }
 
+# plot only upper half (without diagonal)
+# to this end, add another column in which specific values are removed 
+View(plotCorData)
+
+plotCorData$varCovUpper <- plotCorData$varCov
+plotCorData$dim2sort <- factor(plotCorData$dim2, 
+                           levels = c("X1", "X2", "X3", "X4", "Y", "group"))
+plotCorData$dim1sort <- factor(plotCorData$dim1, 
+                           levels = c("X1", "X2", "X3", "X4", "Y", "group"))
+diagnoalIDX <- which(plotCorData$dim1sort == plotCorData$dim2sort)
+lowerTriIDX <- which(as.numeric(plotCorData$dim1sort) < as.numeric(plotCorData$dim2sort))
+plotCorData[lowerTriIDX, "varCovUpper"] <- 0
+# plotCorData[c(diagnoalIDX, lowerTriIDX), "varCovUpper"] <- 0
+
+for (iMIvio in unique(plotCorData$MIvio)) {
+  for (iCor in unique(plotCorData$corGO)) {
+    if (iMIvio == "specific") {
+      col <- colorRampPalette(c("#FFFFFF", "#E6F9E6", "#B3E6B3", "#80CC80", "#4DA64D", "#267326"))
+    } else {
+      col <- colorRampPalette(c("#FFFFFF", "#FFD6D6", "#FF9999", "#FF6666", "#CC3333", "#990000"))
+      # col <- colorRampPalette(c("#FFFFFF", "#FFE5E5", "#FFB2B2", "#FF8080", "#FF4D4D", "#E60000"))
+    }
+    
+    dataTmp <- plotCorData[plotCorData$corGO == iCor &
+                             plotCorData$R2 == 0.8 &
+                             plotCorData$miItems == 2 &
+                             plotCorData$MIvio == iMIvio, ]
+    
+    subIDX <- c(which(as.numeric(dataTmp$dim1sort) >= as.numeric(dataTmp$dim2sort)))
+    
+    pCorSoloTMP <- ggplot(dataTmp, 
+                          aes(x = dim1, y = dim2, fill = varCovUpper)) +
+      geom_tile() +
+      scale_x_discrete(position = "top") +
+      scale_fill_gradientn(colours = col(200),
+                           limits = c(min(plotCorData$varCovUpper), max(plotCorData$varCovUpper))) +
+      geom_text(data = dataTmp[subIDX,], 
+                aes(x = dim1, y = dim2, label = round(varCovUpper, 2)), size = 5) +
+      coord_fixed() +
+      theme_minimal() +
+      xlab("") + ylab("") +
+      guides(fill = "none") +
+      theme(axis.text.x = element_text(hjust = 1),
+            panel.grid = element_blank())
+    
+    (pCorSoloTMP <- themeFunctionPaper(pCorSoloTMP))
+    ggplot2::ggsave(filename = paste0(plotFolder, "/", plotPresentFolder, 
+                                      "/pObservedCorUpper_MIvio", iMIvio, 
+                                      "_P4_cAlpha0.8_varT0.25_corGO", iCor, 
+                                      "_R20.8.png"),
+                    plot = pCorSoloTMP,
+                    width = 11.56,
+                    height = 9.77,
+                    units = "in")
+  }
+}
+
+

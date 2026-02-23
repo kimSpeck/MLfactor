@@ -8,10 +8,13 @@ library(tidyverse)
 
 plotFolder <- "plots"
 createFolder(plotFolder)
+
 plotVarCovFolder <- "varCovPlots"
+# test it
+# plotVarCovFolder <- "varCovPlotsExtra"
 createFolder(paste0(plotFolder, "/", plotVarCovFolder))
 
-dataFolder <- "data"
+dataFolder <- "extraData"
 conditionFolderVec <- list.files(dataFolder, include.dirs = TRUE, recursive = FALSE)
 
 covList <- vector(mode = "list", length(conditionFolderVec))
@@ -61,6 +64,11 @@ for (iCond in seq_along(conditionFolderVec)) {
                   units = "in")
 }
 
-createFolder("results/dependentMeasures")
-save(corList, file = paste0("results/dependentMeasures/observedCorrelationPerCondition.rda"))
-save(covList, file = paste0("results/dependentMeasures/observedCovariancesPerCondition.rda"))
+# createFolder("results/dependentMeasures")
+# save(corList, file = paste0("results/dependentMeasures/observedCorrelationPerCondition.rda"))
+# save(covList, file = paste0("results/dependentMeasures/observedCovariancesPerCondition.rda"))
+
+# test it
+createFolder("extraResults/dependentMeasures")
+save(corList, file = paste0("extraResults/dependentMeasures/observedCorrelationPerCondition.rda"))
+save(covList, file = paste0("extraResults/dependentMeasures/observedCovariancesPerCondition.rda"))
