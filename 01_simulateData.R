@@ -65,13 +65,13 @@ str(grid)
 
 ##### test it #####
 # # test simulation condition that crushes SEM estimation
-# condVec <- which(params$dgp$grid$P == 4 &
-#                    params$dgp$grid$cAlpha == 0.6 &
-#                    params$dgp$grid$miItems == 1 &
+# condVec <- which(params$dgp$grid$P == 8 &
+#                    params$dgp$grid$cAlpha == 0.6 & # 0.6
+#                    params$dgp$grid$miItems == 4 &
 #                    params$dgp$grid$corGO == 0 &
 #                    params$dgp$grid$R2 == 0.8 &
-#                    params$dgp$grid$varT == 0.25 &
-#                    params$dgp$grid$MIvio == "metric")
+#                    params$dgp$grid$varT == 0.25 & # 0.25
+#                    params$dgp$grid$MIvio == "nuanceFactor")
 # iCond <- condVec[1]
 # P <- params$dgp$grid$P[iCond]
 # Q <- params$dgp$grid$Q[iCond]
@@ -90,16 +90,22 @@ str(grid)
 # betaT <- params$dgp$grid$betaT[iCond]
 # varS <- params$dgp$grid$varS[iCond]
 # betaS <- params$dgp$grid$betaS[iCond]
+# covNuanceFactor <- params$dgp$grid$covNuanceFactor[iCond]
 # sampleSeed <- grid$sampleSeed[iCond]
+# 
+# params$dgp$grid[iCond,]
 
 #####
 options(warn = -1)
 
 # sample data in parallel
 createData <- function(P, Q, cAlpha, varT, miItems, corGO, R2, varStable, flT, flS,
-                       varE, MIvio, b0, b1, betaT, varS, betaS, sampleSeed){
+                       varE, MIvio, b0, b1, betaT, varS, betaS, covNuanceFactor, sampleSeed){
   
-  checkFlag <- FALSE
+  # checkFlag: check deviation of parameter estimates from true parameter values
+  #            and get (estimated) standardized factor loadings 
+  checkFlag <- FALSE # set this to true to get checkSample Data 
+  
   ##### measurement model #####
   # ... always simulate nGroups = 2 in every condition but keep parameters identical! 
   
@@ -115,9 +121,11 @@ createData <- function(P, Q, cAlpha, varT, miItems, corGO, R2, varStable, flT, f
   # generate covariance matrix for the factors
   #   variance of the outcome is unknwon but we only need residual variance of the
   #   outcome since y is an endogenuous variable in the structural model
-  MIflag <- if (MIvio != "specific") T else F
+  # MIflag <- if (MIvio != "specific") T else F
+  MIflag <- if (!(MIvio %in% c("specific", "nuanceFactor"))) T else F
   covSEM <- definePhi(nLatentSEM, varT = varT, varStable = varStable, varS = varS,
-                      nItems = P, MIvio = MIflag, miItems = miItems, 
+                      nItems = P, MIvio = MIvio, miItems = miItems, 
+                      covNuanceFactor = covNuanceFactor, 
                       varNames = colnames(lambdaSEM))
   
   # generate residual variance matrix
