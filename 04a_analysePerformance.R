@@ -28,7 +28,8 @@ load(resFile)
 unique(performMeasures$measure_type)
 unique(performMeasures$model)
 
-diffSub <- performMeasures[performMeasures$model %in% c("diff_LM", "diff_Ridge", "diff_ENET") &
+diffVars <- unique(performMeasures$model)[grepl("diff", unique(performMeasures$model))]
+diffSub <- performMeasures[performMeasures$model %in% diffVars &
                   performMeasures$measure_type == "Rsquared_HOtest",]
 
 rm(performMeasures)
@@ -69,13 +70,14 @@ diffSub <- diffSub %>%
   mutate(ID = seq_len(n())) %>%
   ungroup()
 
-outVec <- c("diff_LM", "diff_Ridge", "diff_ENET")
+outVec <- colnames(diffSub)[grepl("diff", colnames(diffSub))]
+# outVec <- c("diff_LM", "diff_Ridge", "diff_ENET")
 for (iOut in outVec) {
   
   # ANOVA:
   anovaTmp <- aov_ez(id = "ID",
                          dv = iOut,
-                         data = diffSub,
+                         data = diffSub[diffSub$MIvio != "nuanceFactor", ],
                          between = c("MIvio", "P", "cAlpha", "varT", "corGO", "R2",
                                      "miItemsPlot"),
                          within = "N")
@@ -162,17 +164,27 @@ diffSub2 <- diffSub %>%
   group_by(N, MIvio) %>%
   mutate(ID = seq_len(n())) %>%
   ungroup()
-
+    
 for (iMI in unique(diffSub2$MIvio)) {
   for (iOut in outVec) {
     
-    # ANOVA:
-    anovaTmp <- aov_ez(id = "ID",
-                       dv = iOut,
-                       data = diffSub2[diffSub2$MIvio == iMI,],
-                       between = c("P", "cAlpha", "varT", "corGO", "R2",
-                                   "miItemsPlot"),
-                       within = "N")
+    if (iMI != "nuanceFactor") {
+      # ANOVA with miItemsPlot because multiple levels in factor
+      anovaTmp <- aov_ez(id = "ID",
+                         dv = iOut,
+                         data = diffSub2[diffSub2$MIvio == iMI,],
+                         between = c("P", "cAlpha", "varT", "corGO", "R2",
+                                     "miItemsPlot"),
+                         within = "N")
+    } else {
+      # ANOVA without miItemsPlot because only one level in factor
+      anovaTmp <- aov_ez(id = "ID",
+                         dv = iOut,
+                         data = diffSub2[diffSub2$MIvio == iMI,],
+                         between = c("P", "cAlpha", "varT", "corGO", "R2"),
+                         within = "N")
+    }
+    
     
     eta2Tmp <- eta_squared(
       anovaTmp, # fitted model
@@ -240,6 +252,115 @@ for (iMI in unique(diffSub2$MIvio)) {
 eta2List <- lapply(grep("eta2_", ls(), value = TRUE), get)
 eta2Table <- do.call(rbind, eta2List)
 
+# compare generalized eta^2 across different methods and predictor sets 
+# calculate rank order coeffiecient (Kendall's Tau)
+# 1st: data to wide format
+# 2nd: get Kendall's Tau and weighted Kendalls' Tau  
+eta2TableCor <- eta2Table[c("Parameter", "Eta2_generalized", "MLmeth", "MIvio")]
+eta2TableCor <- unite(eta2TableCor, "MLmeth_MIvio", c(MLmeth, MIvio), remove = TRUE)
+eta2TableCor <- tidyr::pivot_wider(eta2TableCor, names_from = MLmeth_MIvio, 
+                                   values_from = Eta2_generalized) 
+
+# remove columns with only NAs (no information!)
+naCols <- apply(eta2TableCor, 2, function(x) {all(is.na(x))})
+eta2TableCor <- eta2TableCor[, !naCols]
+
+# all correlations without nuanceFactor
+idxParamCol <- which(colnames(eta2TableCor) == "Parameter")
+idxNF <- which(grepl("nuanceFactor", colnames(eta2TableCor)))
+idx <- union(idxParamCol, idxNF)
+
+# test it
+kendallTau <- cor(eta2TableCor[, -idx], method = "kendall")
+corrplot::corrplot.mixed(kendallTau)
+
+kendallTau_NF <- cor(eta2TableCor[, idxNF], method = "kendall", use = "pairwise.complete.obs")
+corrplot::corrplot.mixed(kendallTau_NF)
+
+# # checK: without weights, the wdm package provides identical estimates as cor!
+# wdmKendallTau_NF <- wdm::wdm(eta2TableCor[, idxNF], method = "kendall")
+# corrplot::corrplot.mixed(wdmKendallTau_NF) 
+
+# differences items - scores for method x MIvio
+grid <- expand.grid(c("LM", "Ridge", "ENET"), c("specific", "metric", "scalar"))
+diffCols <- paste0(rep("diff_", dim(grid)[1]), grid[,"Var1"], "_", grid[,"Var2"])
+idxDiffs <- which(colnames(eta2TableCor) %in% diffCols)
+
+diffGroupCols <- paste0(rep("diff_group_", dim(grid)[1]), grid[,"Var1"], "_", grid[,"Var2"])
+idxGroupDiffs <- which(colnames(eta2TableCor) %in% diffGroupCols)
+
+linearWeights <- seq(from = 1, to = 0, length.out = (dim(eta2TableCor)[1]+1))[1:dim(eta2TableCor)[1]]
+plot(seq(dim(eta2TableCor)[1]), linearWeights)
+wdmKendallTau_Diffs <- wdm::wdm(eta2TableCor[, idxDiffs], method = "kendall", 
+                             weights = linearWeights)
+colnames(wdmKendallTau_Diffs) <- rownames(wdmKendallTau_Diffs) <- substring(colnames(wdmKendallTau_Diffs), 6)
+corrplot::corrplot(wdmKendallTau_Diffs, order = 'hclust', addrect = 3, 
+                   addCoef.col = 'black', tl.srt = 45,
+                   tl.cex = 0.9) # focus on your positive range) 
+
+library(reshape2)
+library(ggplot2)
+ord <- c("LM_specific", "ENET_specific","Ridge_specific",
+         "LM_metric", "ENET_metric","Ridge_metric",
+         "LM_scalar","ENET_scalar","Ridge_scalar")
+wdmKendallTau_Diffs <- wdmKendallTau_Diffs[ord, ord]
+df <- melt(wdmKendallTau_Diffs, varnames = c("row", "col"), value.name = "tau")
+df$row <- factor(df$row, levels = rev(ord))
+df$col <- factor(df$col, levels = ord)
+
+# remove suffix for axis labels: "ENET_metric" -> "ENET"
+strip_suffix <- function(x) sub("_(metric|scalar|specific)$", "", x)
+
+# helper for header positions (tile centers)
+header_y <- length(ord) + 0.9  # above top row of tiles
+
+(pWeightedTau <- ggplot(df, aes(col, row, fill = tau)) +
+  geom_tile(color = "white", linewidth = 0.35) +
+  geom_text(aes(label = sprintf("%.2f", tau)), size = 4) +
+  # positive-only gradient (adjust limits to your range)
+  scale_fill_gradient(low = "#F7FBFF", high = "#08306B",
+                      limits = c(0.45, 1), oob = scales::squish,
+                      name = "Weighted \nKendall's \u03C4") +
+  coord_equal(clip="off") +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid = element_blank(),
+    axis.text.x = element_text(angle = 0, hjust = 0.5, vjust = 1),
+    axis.text.y = element_text(),
+    plot.margin = margin(20, 20, 40, 20)
+  ) +
+  scale_x_discrete(labels = strip_suffix, # position = "top", hjust = 0.5,
+                   expand = expansion(mult = c(0, 0), add = c(0, 0))) +
+  scale_y_discrete(labels = strip_suffix, expand = expansion(mult = c(0, 0), add = c(0, 1.2))) +
+  # draw thick lines between the 3 blocks (after 3 and 6)
+  geom_vline(xintercept = c(3.5, 6.5), linewidth = 1.0, color = "grey20") +
+  geom_hline(yintercept = c(3.5, 6.5), linewidth = 1.0, color = "grey20") +
+  # add block headers (top)
+  annotate("text", x = 2, y = header_y, label = "Specific",   fontface = "bold", size = 4) +
+  annotate("text", x = 5, y = header_y, label = "Metric",   fontface = "bold", size = 4) +
+  annotate("text", x = 8, y = header_y, label = "Scalar", fontface = "bold", size = 4))
+
+ggplot2::ggsave(filename = paste0(plotFolder, "/", plotAnovaFolder, "/weightedTau_difference.png"),
+                plot = pWeightedTau,
+                width = 9.16,
+                height = 9.16,
+                units = "in")
+
+wdmKendallTau_groupDiffs <- wdm::wdm(eta2TableCor[, idxGroupDiffs], method = "kendall", 
+                                weights = linearWeights)
+colnames(wdmKendallTau_groupDiffs) <- rownames(wdmKendallTau_groupDiffs) <- substring(colnames(wdmKendallTau_groupDiffs), 6)
+corrplot::corrplot(wdmKendallTau_Diffs, order = 'hclust', addrect = 3, 
+                   addCoef.col = 'black')
+
+wdmKendallTau_NF <- wdm::wdm(eta2TableCor[, idxNF], method = "kendall", 
+                             weights = linearWeights)
+colnames(wdmKendallTau_NF) <- rownames(wdmKendallTau_NF) <- substring(colnames(wdmKendallTau_NF), 6)
+corrplot::corrplot(wdmKendallTau_NF, order = 'hclust', addrect = 3, 
+                   addCoef.col = 'black')
+
+
+# 
 eta2Table <- tidyr::pivot_wider(eta2Table[,c("Parameter", "Eta2_generalized", "MLmeth", "MIvio")], 
                                 names_from = c(MLmeth, MIvio),  
                                 values_from = Eta2_generalized,
@@ -286,20 +407,27 @@ for (iMLmeth in unique(outVec)){
 # table with LM and ENET next to each other
 idx <- !(stringr::str_detect(colnames(eta2Table), "Ridge"))
 TMPeta2 <- eta2Table[,idx]
+TMPeta2 <-TMPeta2[colnames(TMPeta2)[grepl("Parameter", colnames(TMPeta2)) | 
+                              grepl("diff_ENET", colnames(TMPeta2)) | 
+                              grepl("diff_LM", colnames(TMPeta2))]]
 
 # sort
 TMPeta2$thresh <- apply(TMPeta2[,!(colnames(TMPeta2) %in% "Parameter")], 1, 
                         function(r) any(r >= eta2Thresh))
-TMPeta2$sumEta2 <- apply(TMPeta2[,!(colnames(TMPeta2) %in% c("Parameter", "thresh"))], 1, sum)
-TMPeta2$M <- apply(TMPeta2[,!(colnames(TMPeta2) %in% c("Parameter", "thresh", "sumEta2"))], 1, mean)
+TMPeta2$sumEta2 <- apply(TMPeta2[,!(colnames(TMPeta2) %in% c("Parameter", "thresh"))], 1, sum, na.rm = T)
+TMPeta2$M <- apply(TMPeta2[,!(colnames(TMPeta2) %in% c("Parameter", "thresh", "sumEta2"))], 1, mean, na.rm = T)
 TMPeta2 <- dplyr::arrange(TMPeta2, desc(M))
 
 colnames(TMPeta2)
 texTable <- TMPeta2[TMPeta2$thresh == TRUE,!(colnames(TMPeta2) %in% c("thresh", "sumEta2", "M"))]
-orderCols <- c("Parameter", paste0("diff_ENET", "_specific"), 
+# texTable[colnames(texTable)[grepl("Parameter", colnames(texTable)) | 
+#                      grepl("diff_ENET", colnames(texTable)) | 
+#                      grepl("diff_LM", colnames(texTable))]]
+orderCols <- c("Parameter", 
                paste0("diff_ENET", "_scalar"), paste0("diff_ENET", "_metric"),
-               paste0("diff_LM", "_specific"), 
-               paste0("diff_LM", "_scalar"), paste0("diff_LM", "_metric"))
+               paste0("diff_ENET", "_specific"), paste0("diff_ENET", "_nuanceFactor"),
+               paste0("diff_LM", "_scalar"), paste0("diff_LM", "_metric"),
+               paste0("diff_LM", "_specific"), paste0("diff_LM", "_nuanceFactor"))
 texTable <- texTable[, orderCols]
 
 # formating: round to two
