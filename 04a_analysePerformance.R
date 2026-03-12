@@ -432,12 +432,22 @@ texTable <- texTable[, orderCols]
 
 # formating: round to two
 idxNum <- !(stringr::str_detect(colnames(texTable), "Parameter"))
-texTable[idxNum] <- lapply(texTable[idxNum], function(x) sprintf("%.2f", x))
+# texTable[idxNum] <- lapply(texTable[idxNum], function(x) sprintf("%.2f", x))
 
 # remove leading zero for numbers in (-1,1)
 drop0 <- function(s) {
   gsub("^(-?)0\\.", "\\1.", s) 
 }
+
+# typeset effect sizes > boldThresh in bold + drop leading zero for those effect sizes
+boldThresh <- 0.2
+texTable[idxNum] <- apply(texTable[idxNum], c(1,2), function(x) {
+  ifelse(x >= boldThresh, 
+         paste0("\\textbf{", drop0(sprintf("%.2f", x)), "}"), 
+         sprintf("%.2f", x))
+})
+
+# drop zero for effect sizes <  bold thresh
 texTable[idxNum] <- lapply(texTable[idxNum], drop0)
 
 print(xtable::xtable(texTable, type = "latex"),
