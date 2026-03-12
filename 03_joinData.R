@@ -8,8 +8,8 @@ source("utils/utilityFUNS.R")
 # source("utils/fitTools.R")
 library(tidyverse)
 
-# resFolder <- "results"
-resFolder <- "extraResults"
+resFolder <- "results"
+# resFolder <- "extraResults"
 depFolder <- "dependentMeasures"
 createFolder(paste0(resFolder, "/", depFolder))
 
@@ -23,7 +23,12 @@ colsPerformVec <- ncol(testSample[[1]][["performVec"]])
 colsCondVec <- length(parseFilename(fileVec[1]))
 
 # careful! this might change! (see 02_fitData.R)!
-uniqueModels <- c("items", "score", "comb", "items", "comb", "items", "comb", "comb")
+uniqueModels <- c("items", "score", "comb", "items_group", "score_group", "comb_group", 
+  "items", "comb", "items_group", "comb_group", 
+  "items", "comb", "items_group", "comb_group",
+  "comb", "comb_group")
+
+# uniqueModels <- c("items", "score", "comb", "items", "comb", "items", "comb", "comb")
 
 # fitted models x training sample size (N) x number of sample (nTrain) 
 rowsPerFile <- length(uniqueModels) * length(params$dgp$trainN) * params$sim$nTrain
@@ -101,6 +106,18 @@ performMeasures$diff_LM <- performMeasures$items_LM - performMeasures$score_LM
 performMeasures$diff_Ridge <- performMeasures$items_Ridge - performMeasures$score_LM
 performMeasures$diff_ENET <- performMeasures$items_ENET - performMeasures$score_LM
 
+performMeasures$diff_comb_LM <- performMeasures$items_LM - performMeasures$comb_LM
+performMeasures$diff_comb_Ridge <- performMeasures$items_Ridge - performMeasures$comb_Ridge
+performMeasures$diff_comb_ENET <- performMeasures$items_ENET - performMeasures$comb_ENET
+
+performMeasures$diff_group_LM <- performMeasures$items_group_LM - performMeasures$score_group_LM
+performMeasures$diff_group_Ridge <- performMeasures$items_group_Ridge - performMeasures$score_group_LM
+performMeasures$diff_group_ENET <- performMeasures$items_group_ENET - performMeasures$score_group_LM
+
+performMeasures$diff_combGroup_LM <- performMeasures$items_group_LM - performMeasures$comb_group_LM
+performMeasures$diff_combGroup_Ridge <- performMeasures$items_group_Ridge - performMeasures$comb_group_Ridge
+performMeasures$diff_combGroup_ENET <- performMeasures$items_group_ENET - performMeasures$comb_group_ENET
+
 performMeasures <- tidyr::pivot_longer(performMeasures, 
                                        cols = !c("MIvio", "miItems", "P", "Q", "cAlpha", "varT",
                                                  "corGO", "R2", "sample", "N", "measure_type",
@@ -144,9 +161,9 @@ coefMatrix <- data.frame(coefMatrix)
 # str(coefMatrix)
 names(coefMatrix) <- c("MIvio","miItems","P","Q","cAlpha","varT","corGO","R2", 
                        "sample", "N", "model", "predSet", "intercept", "X1", "X2", 
-                       "X3", "X4", "X5", "X6", "X7", "X8", "score")
+                       "X3", "X4", "X5", "X6", "X7", "X8", "group", "score")
 
-col2num <- c("R2", "intercept", "X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8", "score")
+col2num <- c("R2", "intercept", "X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8", "group", "score")
 coefMatrix[col2num] <- sapply(coefMatrix[col2num], as.numeric)
 
 col2fac <- c("MIvio","miItems","P","Q","cAlpha","varT","corGO", "sample", "N", "model", "predSet")
@@ -171,7 +188,10 @@ gc()
 colsHyperVec <- ncol(testSample[[1]][["hyperParams"]])
 
 # careful! this might change! (see 02_fitData.R)!
-uniqueModels <- c("items", "comb", "items", "comb", "comb")
+uniqueModels <- c("items", "comb", "items_group", "comb_group", 
+                  "items", "comb", "items_group", "comb_group",
+                  "comb", "comb_group")
+# uniqueModels <- c("items", "comb", "items", "comb", "comb")
 
 # fitted models x training sample size (N) x number of sample (nTrain) 
 rowsPerFileHyper <- length(uniqueModels) * length(params$dgp$trainN) * params$sim$nTrain
