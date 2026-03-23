@@ -1,71 +1,132 @@
 # load parameters & custom functions 
 source("utils/setParam.R") # parameter values
-params$sim$nTrain <- 100
-
 source("utils/utilityFUNS.R")
 
 library(tidyverse)
 
-# test it
-# resFolder <- "results"
-resFolder <- "extraResults"
+resFolder <- "results"
 depFolder <- "dependentMeasures"
 
 plotFolder <- "plots"
 createFolder(plotFolder)
-# test it
-# plotPerformanceFolder <- "performance"
-plotPerformanceFolder <- "performanceExtra"
+
+plotPerformanceFolder <- "performance"
 createFolder(paste0(plotFolder, "/", plotPerformanceFolder))
 
 resFile <- paste0(resFolder, "/", depFolder, "/performStats.rda")
 load(resFile)
 
 ################################################################################
-# plot test plot
+# plot aesthetic
 ################################################################################
-themeFunctionPaper <- function(plotObject, guides = T){
-  pTmp <- plotObject + theme(
-    panel.grid.major = element_line(linewidth = 0.15, linetype = 'solid', color = "lightgrey"), 
-    panel.grid.minor = element_line(linewidth = 0.1, linetype = 'solid', color = "lightgrey"),
-    panel.background = element_rect(color = "white", fill = "white"),
-    plot.title = element_text(size = 30, face = "bold"),
-    axis.text.y = element_text(size = 20),
-    axis.text.x = element_text(size = 20),
-    axis.title.x = element_text(size = 20),
-    axis.title.y = element_text(size = 20),
-    strip.text.x = element_text(size = 15),
-    strip.text.y = element_text(size = 15),
-    #legend.position = c(.85, .39), 
-    legend.position = "bottom", 
-    legend.title = element_text(size = 25),
-    legend.text = element_text(size = 20),
-    legend.key.width = unit(2, "cm"),
-    legend.box = "horizontal")
-  if (guides == F) {
-    pTmp <- pTmp + guides(color = "none", shape = "none", linetype = "none")
-  }
-  return(pTmp)
-}
-
 # comb, items, score
 shapeVec <- c(13, 20, 3)
 colVec <- c( "#006400", "#FF7F50", "#B22222") 
 lineTypeVec <- c("solid", "dotted", "dashed")
 
 ################################################################################
+# difference plots (paper selection)
+################################################################################
+diffSub <- performStats[performStats$model %in% c("diff_LM", "diff_ENET", "diff_Ridge", 
+                                                  "diff_group_LM", "diff_group_ENET", "diff_group_Ridge"),]
+
+diffSub$model <- sub("^.{5}", "", diffSub$model)
+diffSub <- tidyr::separate(diffSub, model, into = c("predSet", "predMeth"), 
+                           sep = "_", fill = "left")
+diffSub$predSet <- ifelse(is.na(diffSub$predSet), "items", diffSub$predSet)
+
+diffSub$R2 <- factor(diffSub$R2)
+diffSub$MIvio <- factor(diffSub$MIvio, 
+                        levels = c("metric", "scalar", "specific", "nuanceFactor"), 
+                        labels = c("metric", "scalar", "nuance", "NF"))
+
+plotMeasureType <- "Rsquared_HOtest"
+plotPredMeth <- "ENET"
+
+#shapeVec <- c(1, 6)
+shapeVec <- c(3, 4)
+colVec <- c( "#006400", "#FF7F50", "#B22222") 
+lineTypeVec <- c("dashed", "solid")
+
+# generate different plots!
+# varT: only difference in height; varT = 0.25 more pronounced differences
+# predSet: show both; but after another! both plots in the paper but add group later 
+#           and examine how differences change
+# n: only show N = 1000 (only difference in uncertainty due to large effect sizes)
+# cAlpha: only show cAlpha = 0.8 due to higher std.FLs which are more realistic;
+#         provide cAlpha = 0.6 as another results plot in additional online Material
+varTvec <- unique(diffSub$varT)
+predSetVec <- unique(diffSub$predSet)
+nVec <- unique(diffSub$N)
+cAlphaVec <- unique(diffSub$cAlpha)
+
+# # test it: items_1000_0.25_0.8
+# iVarT <- 0.25
+# iPredSet <- "items" # "group"
+# iN <- 1000
+# iAlpha <- 0.8
+
+for (iVarT in varTvec) {
+  for (iPredSet in predSetVec) {
+    for (iN in nVec) {  
+      for (iAlpha in cAlphaVec) {
+        pTmp <- ggplot(diffSub[diffSub$measure_type == plotMeasureType & 
+                                  diffSub$varT == iVarT &
+                                  diffSub$N == iN &
+                                  diffSub$predSet == iPredSet &
+                                  diffSub$cAlpha == iAlpha &
+                                  diffSub$predMeth == plotPredMeth,], 
+                        aes(x = MIvio, y = M, 
+                            group = interaction(miItemsPlot, P), 
+                            color = miItemsPlot,
+                            shape = P, 
+                            fill = P,
+                            linetype = P)) +
+           geom_abline(intercept = 0, slope = 0, "black", alpha = 0.7) +
+           geom_errorbar(aes(ymin = M - 2*SD, ymax = M + 2*SD), alpha = 0.2, width = 0.1) + 
+           geom_point(aes(fill = P), size = 4, alpha = 0.7) +
+           geom_line(alpha = 0.7, linewidth = 1) +
+           scale_shape_manual(values = shapeVec) +
+           scale_color_manual(values = colVec) +
+           scale_linetype_manual(values = lineTypeVec) +
+           ylab(paste0("R² difference (items - score)")) +
+           facet_grid(corGO ~ R2)
+        
+        pTmp <- themeFunctionPaper(pTmp)
+        
+        plotName <- paste0(plotFolder, "/", plotPerformanceFolder, 
+                           "/pDiffR2_Ho_", iPredSet, "_N", iN, "_varT", iVarT, 
+                           "_alpha", iAlpha, ".png")
+        
+        ggplot2::ggsave(filename = plotName,
+                        plot = pTmp,
+                        width = 13.63,
+                        height = 9.60,
+                        units = "in")
+      }
+    }
+  }  
+} 
+
+# paperPlots:
+# items_1000_0.25_0.8
+# group_1000_0.25_0.8
+
+################################################################################
 # difference measures on train, cvTest and hoTest
 ################################################################################
-diffSub <- performStats[performStats$model %in% c("diff_LM", "diff_ENET", "diff_Ridge"),]
+diffSub <- performStats[performStats$model %in% c("diff_group_LM", "diff_group_ENET", "diff_group_Ridge"),]
 # str(diffSub)
+range(diffSub$M)
 diffSub$model <- factor(diffSub$model, 
-                        levels = c("diff_LM", "diff_Ridge", "diff_ENET"), 
+                        levels = c("diff_group_LM", "diff_group_Ridge", "diff_group_ENET"), 
                         labels = c("LM", "Ridge", "ENET"))
 
 # iterate over these vectors ...  
 MIvioVec <- unique(diffSub$MIvio)
 varTvec <- unique(diffSub$varT)
-measureTypeVec <- unique(diffSub$measure_type)
+# measureTypeVec <- unique(diffSub$measure_type)
+measureTypeVec <- "Rsquared_HOtest"
 
 # plot differences in all measure types, for all MIviolations and every varT condition
 for (iMIvio in MIvioVec) {
@@ -81,7 +142,7 @@ for (iMIvio in MIvioVec) {
         geom_abline(intercept = 0, slope = 0, "black", alpha = 0.5) +
         geom_errorbar(aes(ymin = M - 2*SD, ymax = M + 2*SD), alpha = 0.2, width = 0.1) + 
         geom_point(size = 3) +
-        geom_line(alpha = 0.4, linewidth = 0.75) +
+        geom_line(alpha = 0.7, linewidth = 0.75) +
         scale_shape_manual(values = shapeVec) +
         scale_color_manual(values = colVec) +
         scale_linetype_manual(values = lineTypeVec) +
@@ -116,7 +177,7 @@ for (iMIvio in MIvioVec) {
 
 
 diffSub$MIvio <- factor(diffSub$MIvio, 
-                        levels = c("specific", "metric", "scalar"))
+                        levels = c("specific", "nuanceFactor", "metric", "scalar"))
 
 # plot every combination of varT and R2 with MI/specific effect manipulation
 #   directly next to each other
