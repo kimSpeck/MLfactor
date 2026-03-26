@@ -181,7 +181,7 @@ definePhi <- function(nLatentSEM, varT, varStable, varS, nItems, MIvio = F, miIt
   
   
   # if (!MIvio) { # specific or nuance
-  if (MIvio %in% c("specific", "nuanceFactor")) {
+  if (MIvio %in% c("specific", paste0("NF_", params$dgp$corNuanceFactor))) {
     phi <- diag(nLatentSEM) * c(rep(c(varT, rep(varS, nItems)), times = params$dgp$nGroups),  
                                 # rep(params$dgp$sigmaEy, params$dgp$nOutcome))
                                 rep(params$dgp$sigmaEy, params$dgp$nOutcome * params$dgp$nGroups))
@@ -198,7 +198,7 @@ definePhi <- function(nLatentSEM, varT, varStable, varS, nItems, MIvio = F, miIt
     colnames(phi) <- rownames(phi) <- varNames
   }
   
-  if (MIvio == "nuanceFactor") {
+  if (MIvio %in% c(paste0("NF_", params$dgp$corNuanceFactor))) {
     miVars_g1 <- paste0("S", (nItems-miItems+1):nItems, "_g1")
     miVars_g2 <- paste0("S", (nItems-miItems+1):nItems, "_g2")
     

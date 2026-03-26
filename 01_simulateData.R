@@ -122,7 +122,7 @@ createData <- function(P, Q, cAlpha, varT, miItems, corGO, R2, varStable, flT, f
   #   variance of the outcome is unknwon but we only need residual variance of the
   #   outcome since y is an endogenuous variable in the structural model
   # MIflag <- if (MIvio != "specific") T else F
-  MIflag <- if (!(MIvio %in% c("specific", "nuanceFactor"))) T else F
+  MIflag <- if (!(MIvio %in% c("specific", paste0("NF_", params$dgp$corNuanceFactor)))) T else F
   covSEM <- definePhi(nLatentSEM, varT = varT, varStable = varStable, varS = varS,
                       nItems = P, MIvio = MIvio, miItems = miItems, 
                       covNuanceFactor = covNuanceFactor, 

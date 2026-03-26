@@ -301,19 +301,21 @@ params$dgp$grid$betaS <- ifelse(params$dgp$grid$MIvio != "specific", 0, params$d
 # add condition with correlations between item-specific variance (only for nuance condition "specific")
 # this manipulation is only meaningful if miItems > 1
 # unique(params$dgp$grid$miItems)
-duplicate <- params$dgp$grid[params$dgp$grid$MIvio == "specific" &
-                               params$dgp$grid$miItems > 1, ]
-duplicate$MIvio <- "nuanceFactor"
-params$dgp$grid <- rbind(params$dgp$grid, duplicate)
-rm(duplicate)
 
-params$dgp$MIvio <- unique(params$dgp$grid$MIvio)
-params$dgp$corNuanceFactor <- .5 
-params$dgp$grid$covNuanceFactor <- sapply(seq_len(dim(params$dgp$grid)[1]), function(iRow) {
-  return(ifelse(params$dgp$grid$MIvio[iRow] == "nuanceFactor", 
-         getCovNuance(targetR = params$dgp$corNuanceFactor, 
-                      varS = params$dgp$grid$varS[iRow]), 0))
-})
+params$dgp$grid$covNuanceFactor <- 0
+
+params$dgp$corNuanceFactor <- c(.5, .7, .9) 
+
+for (iCorNF in params$dgp$corNuanceFactor){
+  duplicate <- params$dgp$grid[params$dgp$grid$MIvio == "specific" &
+                                 params$dgp$grid$miItems > 1, ]
+  duplicate$MIvio <- paste0("NF_", iCorNF)
+  duplicate$covNuanceFactor <- sapply(seq_len(dim(duplicate)[1]), function(iRow) {
+    return(getCovNuance(targetR = iCorNF, 
+                        varS = params$dgp$grid$varS[iRow]))
+  })
+  params$dgp$grid <- rbind(params$dgp$grid, duplicate)
+}
 
 
 # create seed number for parallel cluster (reproducibility of generated data)
