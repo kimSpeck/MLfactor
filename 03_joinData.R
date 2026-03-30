@@ -16,6 +16,9 @@ createFolder(paste0(resFolder, "/", depFolder))
 fileVec <- list.files(resFolder, pattern = "^resFile_", 
                       include.dirs = FALSE, recursive = FALSE)
 
+# # code couldn't cope with naming convention; change file names automatically!
+# renameFiles <- sub("MIvioNF_", "MIvioNF", fileVec)
+# file.rename(paste0(resFolder, "/", fileVec), paste0(resFolder, "/", renameFiles))
 
 # get result object dimensions
 testSample <- readRDS(paste0(resFolder, "/", fileVec[1]))
