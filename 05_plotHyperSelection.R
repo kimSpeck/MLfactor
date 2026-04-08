@@ -19,8 +19,85 @@ hyperSelection$miItemsPlot <- ifelse(hyperSelection$miItems %in% c(2, 4), "P/2",
 hyperSelection$N <- factor(hyperSelection$N, levels = c(100, 300, 1000))
 
 ################################################################################
+# How are tuned alpha values distributed? 
+################################################################################
+# this illustrates tuned alpha values in every replication via a violin plot
+# (plot-design is equivalent to Delta R^2 plots of the results section)
+plotAlpha <- hyperSelection[hyperSelection$model == "ENET" & 
+                              hyperSelection$predSet == "items", ]
+
+plotAlpha <- plotAlpha[which(!grepl("^NF0\\.", plotAlpha$MIvio)), ]
+varTvec <- unique(plotAlpha$varT)
+nVec <- unique(plotAlpha$N)
+cAlphaVec <- unique(plotAlpha$cAlpha)
+plotAlpha$MIvio <- factor(plotAlpha$MIvio, 
+                          levels = c("metric", "scalar", "specific"), 
+                          labels = c("metric", "scalar", "nuance"))
+
+plotAlpha$corGO_lab <- paste0("r[GY]==", plotAlpha$corGO)
+plotAlpha$R2_lab    <- paste0("R[sim]^2==", plotAlpha$R2)
+
+shapeVec <- c(3, 4)
+colVecViridis <- c("#337538", "#0072B2", "#CC79A7")
+dodge_w <- 1
+
+for (iVarT in varTvec) {
+  for (iN in nVec) {  
+    for (iAlpha in cAlphaVec) {
+      pTmp <- ggplot(plotAlpha[plotAlpha$varT == iVarT &
+                                 plotAlpha$N == iN &
+                                 plotAlpha$cAlpha == iAlpha,], 
+                     aes(x = MIvio, y = alpha, 
+                         group = interaction(P, MIvio, miItemsPlot), 
+                         color = miItemsPlot, 
+                         fill = miItemsPlot)) +
+        geom_hline(yintercept = 0, colour = "black", linewidth = 0.4, alpha = 0.4) +
+        geom_violin(
+          aes(linetype = P), 
+          position = position_dodge(width = dodge_w),
+          width = 1.25,
+          trim = TRUE,
+          alpha = 0.80,
+          linewidth = 0.65
+        ) +
+        stat_summary(aes(shape = P),
+                     fun = mean,
+                     geom = "point",
+                     color = "black",
+                     position = position_dodge(width = dodge_w),
+                     size = 1.7,
+                     stroke = 0.5
+        ) +
+        scale_color_manual(values = colVecViridis, name = "MI items") +
+        scale_fill_manual(values = colVecViridis, name = "MI items") +
+        scale_shape_manual(values = shapeVec, name = "P") +
+        guides(linetype = "none") +
+        labs(y = expression("tuned"~alpha), x = "source of item-specific variance") +
+        facet_grid(corGO_lab ~ R2_lab, labeller = label_parsed)
+      
+      pTmp <- themeFunctionPaper(pTmp) + 
+        coord_cartesian(ylim = c(0, 1)) +
+        scale_y_continuous(
+          breaks = seq(0, 1, by = 0.5))
+      
+      plotName <- paste0(plotFolder, "/", plotHyperFolder, 
+                         "/alpha0_N", iN, "_varT", iVarT, 
+                         "_cAlpha", iAlpha, "_violinPlots.png")
+      
+      ggplot2::ggsave(filename = plotName,
+                      plot = pTmp,
+                      width = 13.63,
+                      height = 9.60,
+                      units = "in")
+    }
+  }
+}  
+################################################################################
 # How often is ENET essentially a ridge regression, due to alpha == 0?
 ################################################################################
+# this illustrates the number of replications that chose exactly alpha = 0!
+# essentially: How many replications estimated Ridge regression due to tuning?
+
 hyperSelection$alpha <- factor(hyperSelection$alpha)
 
 countAlpha <- hyperSelection %>% 
@@ -40,18 +117,18 @@ countAlpha <- countAlpha[countAlpha$model != "Ridge", ]
 # View(countAlpha[which(countAlpha$predSet == "items" & 
 #                         countAlpha$alpha == 0), ])
 
-
-plotRidge <- countAlpha[which(countAlpha$predSet == "items" & 
+plotRidge <- countAlpha[which(!grepl("^NF0\\.", countAlpha$MIvio) &
+                                countAlpha$predSet == "items" & 
                                 countAlpha$alpha == 0), ]
 varTvec <- unique(plotRidge$varT)
 nVec <- unique(plotRidge$N)
 cAlphaVec <- unique(plotRidge$cAlpha)
 plotRidge$nPC <- plotRidge$n / params$sim$nTrain
 plotRidge$MIvio <- factor(plotRidge$MIvio, 
-                        levels = c("metric", "scalar", "specific", "nuanceFactor"), 
-                        labels = c("metric", "scalar", "nuance", "NF"))
+                        levels = c("metric", "scalar", "specific"), 
+                        labels = c("metric", "scalar", "nuance"))
 shapeVec <- c(3, 4)
-colVec <- c( "#006400", "#FF7F50", "#B22222") 
+colVec <- c("#337538", "#0072B2", "#CC79A7") 
 lineTypeVec <- c("dashed", "solid")
 
 range(plotRidge$nPC)
@@ -84,7 +161,7 @@ for (iVarT in varTvec) {
       
       plotName <- paste0(plotFolder, "/", plotHyperFolder, 
                          "/alpha0_N", iN, "_varT", iVarT, 
-                         "_cAlpha", iAlpha, ".png")
+                         "_cAlpha", iAlpha, "_linePlots.png")
       
       ggplot2::ggsave(filename = plotName,
                       plot = pTmp,
