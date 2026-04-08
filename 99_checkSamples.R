@@ -1,8 +1,26 @@
 # load parameters & custom functions 
 source("utils/setParam.R") # parameter values
+source("utils/utilityFUNS.R")
 
 # load R packages
 library(ggplot2)
+
+# result object structure (plots, tables, ...)
+plotFolder <- "plots"
+createFolder(plotFolder)
+
+plotCheckFolder <- "checkGraphics"
+createFolder(paste0(plotFolder, "/", plotCheckFolder))
+
+# path to folder with check data
+checkDataFolder <- "checkData"
+conditionFolders <- dir(checkDataFolder) # every condition folder 
+
+# rename
+fileVec <- list.files(checkDataFolder, pattern = "^checkData_", 
+                      include.dirs = FALSE, recursive = FALSE)
+renameFiles <- sub("MIvioNF_", "MIvioNF", fileVec)
+file.rename(paste0(checkDataFolder, "/", fileVec), paste0(checkDataFolder, "/", renameFiles))
 
 # function to parse file name to extract condition parameters
 parseFilename <- function(x) {
@@ -30,20 +48,21 @@ parseFilename <- function(x) {
 # parseFilename(iFile)
 
 # path to folder with check data
-checkDataFolder <- "data/checkData"
-conditionFolders <- dir(checkDataFolder) # every condition folder 
+checkDataFolder <- "checkData"
+conditionFiles <- dir(checkDataFolder) # every condition folder 
 
 # prepare result objects as a list with entry for every condition
 # one value per sample
-sampleStats <- vector(mode = "list", length = length(conditionFolders)) 
+sampleStats <- vector(mode = "list", length = length(conditionFiles)) 
 # P {4, 8} values per sample; there are NAs!
-variableStats <- vector(mode = "list", length = length(conditionFolders))
+variableStats <- vector(mode = "list", length = length(conditionFiles))
 
 # iterate through all conditions to extract data into one object
-for (iFolder in seq_len(length(conditionFolders))) {
+for (iFolder in seq_len(length(conditionFiles))) {
   # get file name and load data
-  iFile <- list.files(paste0(checkDataFolder, "/", conditionFolders[iFolder]))
-  load(paste0(checkDataFolder, "/", conditionFolders[iFolder], "/", iFile))
+  # iFile <- list.files(paste0(checkDataFolder, "/", conditionFiles[iFolder]))
+  iFile <- paste0(checkDataFolder, "/", conditionFiles[iFolder])
+  load(paste0(checkDataFolder, "/", conditionFiles[iFolder]))
   
   # vector of item names
   itemNames <- sapply(seq_len(as.numeric(data[[1]]$condition[["P"]])), function(iP) {
@@ -128,6 +147,59 @@ length(naIdx)
 #     -> solid at 0.25 for every condition
 plot(sampleStats$varG_hat)
 
+# check simulated ...
+# ... variance of the outcome variable
+plot(sampleStats$varY_hat)
+
+sampleStats$corNF <- ifelse(grepl("NF", sampleStats$MIvio), 
+                        substr(sampleStats$MIvio, 3, nchar(as.character(sampleStats$MIvio[1]))), 
+                        0)
+sampleStats$MIvio <- ifelse(grepl("NF", sampleStats$MIvio), "NF", sampleStats$MIvio)
+sampleStats$miItemsPlot <- ifelse(sampleStats$miItems > 1, "P/2", sampleStats$miItems)
+
+
+# P & cAlpha essentially irrelevant
+(yHatplot_MI <- ggplot(sampleStats[sampleStats$MIvio %in% c("metric", "scalar"), ], 
+       aes(x = corGO, y = varY_hat, group = R2, color = R2)) +
+  geom_jitter(size = 3) +
+  facet_grid(~ MIvio) + 
+  scale_colour_grey(start = 0.8, end = 0.2, name = expression(R^2)))
+
+(yHatplot_MI <- themeFunctionPaper(yHatplot_MI) + 
+    labs(x = expression(r[GY]), y = expression(Var(hat(Y)))))
+  
+ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/checkY_MIconditions.png"),
+                plot = yHatplot_MI,
+                width = 13.63,
+                height = 9.60,
+                units = "in")
+
+# (yHatplot_nuances <- ggplot(sampleStats[sampleStats$MIvio %in% c("specific", "NF"), ],
+#        aes(x = R2, y = varY_hat, group = interaction(corNF, corGO),
+#            color = corGO , shape = corNF)) +
+#   geom_jitter() +
+#   facet_grid(varT ~ miItems))
+
+sampleStats$miItemsLabels <- paste0("# nuances: ", sampleStats$miItems)
+
+(yHatplot_nuances <- ggplot(sampleStats[sampleStats$MIvio == "specific", ],
+                            aes(x = corGO, y = varY_hat, group = interaction(varT, R2),
+                                color = R2 , shape = varT)) +
+    geom_jitter(size = 3) +
+    scale_colour_grey(start = 0.8, end = 0.2, name = expression(R^2)) +
+    scale_shape_discrete(name = expression(Var("F"))) +
+    facet_grid( ~ miItemsLabels))
+
+(yHatplot_nuances <- themeFunctionPaper(yHatplot_nuances) + 
+    labs(x = expression(r[GY]), y = expression(Var(hat(Y)))))
+
+ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/checkY_nuanceConditions.png"),
+                plot = yHatplot_nuances,
+                width = 13.63,
+                height = 9.60,
+                units = "in")
+
+
 # ... correlation coefficient
 #     -> correlations slightly too small
 #     -> Abweichungen in der 3. Nachkommastelle
@@ -210,38 +282,10 @@ ggplot(sampleStats[sampleStats$miItems == "0", ],
   facet_wrap( ~ cAlpha) # nicht MIvio, varT
 
 ################################################################################
-# preliminary R2 comparisons (items vs. scores)
-################################################################################
-# initial plots to compare R2 for items vs. scores (in linear regression)
-plot(sampleStats[,"R2_items"], sampleStats[,"R2_score"])
-# difference between items and score R2 (positive values: items > scores)
-sampleStats$R2_diff <- sampleStats$R2_items - sampleStats$R2_score
-sampleStats$R2_relDiff <- (sampleStats$R2_items - sampleStats$R2_score)/sampleStats$R2_sim 
-
-sampleStats$MIvio <- factor(sampleStats$MIvio, 
-                            levels = c("specific", "metric", "scalar"))
-
-ggplot(sampleStats[sampleStats$cAlpha == 0.6 &
-                     sampleStats$varT == 0.25, ], 
-       aes(x = MIvio, y = R2_diff, group = interaction(miItemsPlot, P), 
-           color = miItemsPlot, fill = miItemsPlot,
-           linetype = P)) +
-  geom_point() + 
-  geom_line() + 
-  facet_grid(R2 ~ corGO)
-
-ggplot(sampleStats[sampleStats$cAlpha == 0.6 &
-                     sampleStats$varT == 0.5, ], 
-       aes(x = MIvio, y = R2_relDiff, group = interaction(miItemsPlot, P), 
-           color = miItemsPlot, fill = miItemsPlot,
-           linetype = P)) +
-  geom_point() + 
-  geom_line() + 
-  facet_grid(R2 ~ corGO)
-
+# plot standardized factor loadings
 ################################################################################
 variableStats <- as.data.frame(do.call(rbind, variableStats))
-colnames(variableStats) <- c("MIvio", "miItems", "P", "Q", "cAlpha", "varT", "corGO", "R2",  
+colnames(variableStats) <- c("MIvio", "miItems", "P", "Q", "cAlpha", "varT", "corGO", "R2",
                              "measure", "true", "X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8")
 
 # change variable types
@@ -256,14 +300,20 @@ variableStats$sd <- matrixStats::rowSds(as.matrix(variableStats[, itemNames], nc
 
 unique(variableStats$measure)
 
+variableStats$corNF <- ifelse(grepl("NF", variableStats$MIvio), 
+                            substr(variableStats$MIvio, 3, nchar(as.character(variableStats$MIvio[1]))), 
+                            0)
+variableStats$MIvio <- ifelse(grepl("NF", variableStats$MIvio), "NF", variableStats$MIvio)
+variableStats$miItemsPlot <- ifelse(variableStats$miItems > 1, "P/2", variableStats$miItems)
+
 # check parameter estimates averaged across P items
 #   ... only for miItems = 0!
 variableStats$diff <-  variableStats$true - variableStats$mean
 
 # item variances (manifest variable); should be fixed to 1
 ggplot(variableStats[variableStats$miItems == "0" &
-                       variableStats$measure == "varItems", ], 
-       aes(x = cAlpha, y = diff, group = interaction(P, R2), 
+                       variableStats$measure == "varItems", ],
+       aes(x = cAlpha, y = diff, group = interaction(P, R2),
            color = interaction(P, R2), fill = interaction(P, R2))) +
   geom_jitter()
 
@@ -271,66 +321,66 @@ ggplot(variableStats[variableStats$miItems == "0" &
 
 # lambda
 ggplot(variableStats[variableStats$miItems == "0" &
-                       variableStats$measure == "lambda", ], 
-       aes(x = R2, y = diff, group = P, 
+                       variableStats$measure == "lambda", ],
+       aes(x = R2, y = diff, group = P,
            color = P, fill = P)) +
-  geom_jitter() + 
+  geom_jitter() +
   facet_grid(cAlpha ~ varT)
 
 # theta
 ggplot(variableStats[variableStats$miItems == "0" &
-                       variableStats$measure == "theta", ], 
-       aes(x = cAlpha, y = diff, group = P, 
+                       variableStats$measure == "theta", ],
+       aes(x = cAlpha, y = diff, group = P,
            color = P, fill = P)) +
   geom_jitter()
 
 
-# R2 true score on items 
+# R2 true score on items
 ggplot(variableStats[variableStats$miItems == "0" &
-                       variableStats$measure == "R2_itemsT", ], 
-       aes(x = cAlpha, y = diff, group = interaction(P, R2), 
+                       variableStats$measure == "R2_itemsT", ],
+       aes(x = cAlpha, y = diff, group = interaction(P, R2),
            color = interaction(P, R2), fill = interaction(P, R2))) +
   geom_jitter()
 
 # examine standardized factor loadings
 variableStats$miItemsLevels <- ifelse(variableStats$miItems > 1, 2, variableStats$miItems)
-variableStats$MIvio <- factor(variableStats$MIvio, 
-                              levels = c("metric", "scalar", "specific", "nuanceFactor"), 
-                              labels = c("metric", "scalar", "nuance", "nuanceFactor"))
-ggplot(variableStats[variableStats$measure == "lambda.std", ], 
-       aes(x = miItemsLevels, y = mean, group = P, 
+variableStats$MIvio <- factor(variableStats$MIvio,
+                              levels = c("metric", "scalar", "specific", "NF"),
+                              labels = c("metric", "scalar", "nuance", "NF"))
+ggplot(variableStats[variableStats$measure == "lambda.std", ],
+       aes(x = miItemsLevels, y = mean, group = P,
            color = P, shape = P)) +
-  geom_jitter() + 
+  geom_jitter() +
   facet_grid(cAlpha ~  MIvio)
 
 # long format of items
 stdLambdaSub <- variableStats[variableStats$measure == "lambda.std", ]
 Xcols <- grep("^X\\d+$", names(stdLambdaSub), value = TRUE)
-stdLambdaSub_long <- tidyr::pivot_longer(stdLambdaSub, Xcols, 
+stdLambdaSub_long <- tidyr::pivot_longer(stdLambdaSub, Xcols,
                                          names_to = "item", values_to = "flT.std")
 stdLambdaSub_long$manipulated <- ifelse(as.numeric(stdLambdaSub_long$miItems) > 0 &
-                                          as.numeric(substr(stdLambdaSub_long$item, 2, 2)) > 
+                                          as.numeric(substr(stdLambdaSub_long$item, 2, 2)) >
                                           as.numeric(stdLambdaSub_long$P) - as.numeric(stdLambdaSub_long$miItems), 1, 0)
 
 unique(stdLambdaSub_long$manipulated)
 stdLambdaSub_long$manipulated <- factor(stdLambdaSub_long$manipulated)
-stdLambdaSub_long$miItemsLevels <- factor(stdLambdaSub_long$miItemsLevels, 
-                                          levels = c(0, 1, 2), 
+stdLambdaSub_long$miItemsLevels <- factor(stdLambdaSub_long$miItemsLevels,
+                                          levels = c(0, 1, 2),
                                           labels = c("0", "1", "50%"))
 
-(stdFL_perItem <- ggplot(stdLambdaSub_long, 
-       aes(x = miItemsLevels, y = flT.std, group = P, 
+(stdFL_perItem <- ggplot(stdLambdaSub_long,
+       aes(x = miItemsLevels, y = flT.std, group = P,
            color = manipulated, shape = P, fill = manipulated)) +
-  geom_jitter() + 
-  facet_grid(cAlpha ~  MIvio) + 
-  scale_color_manual(values = c("#D55E00", "#0072B2")) + 
+  geom_jitter() +
+  facet_grid(cAlpha ~  MIvio) +
+  scale_color_manual(values = c("#D55E00", "#0072B2")) +
   scale_y_continuous(breaks = scales::breaks_width(0.1)) +
   ylab("Standardized Factor Loadings") +
   xlab("Number of Manipulated Items"))
 
 themeFunctionPaper <- function(plotObject, guides = T){
   pTmp <- plotObject + theme(
-    panel.grid.major = element_line(linewidth = 0.15, linetype = 'solid', color = "lightgrey"), 
+    panel.grid.major = element_line(linewidth = 0.15, linetype = 'solid', color = "lightgrey"),
     panel.grid.minor = element_line(linewidth = 0.1, linetype = 'solid', color = "lightgrey"),
     panel.background = element_rect(color = "white", fill = "white"),
     plot.title = element_text(size = 30, face = "bold"),
@@ -340,8 +390,8 @@ themeFunctionPaper <- function(plotObject, guides = T){
     axis.title.y = element_text(size = 20),
     strip.text.x = element_text(size = 15),
     strip.text.y = element_text(size = 15),
-    #legend.position = c(.85, .39), 
-    legend.position = "bottom", 
+    #legend.position = c(.85, .39),
+    legend.position = "bottom",
     legend.title = element_text(size = 25),
     legend.text = element_text(size = 20),
     legend.key.width = unit(2, "cm"),
@@ -353,20 +403,20 @@ themeFunctionPaper <- function(plotObject, guides = T){
 }
 
 (stdFL_perItem <- themeFunctionPaper(stdFL_perItem))
-ggplot2::ggsave(filename = paste0("plots", "/stdFactorLoadings_perItem_appendix.png"),
+ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/stdFactorLoadings_perItem_appendix.png"),
                 plot = stdFL_perItem,
                 width = 11.66,
                 height = 9.12,
                 units = "in")
 
 
-# mean for MI manipulated vs. unmanipulated items 
+# mean for MI manipulated vs. unmanipulated items
 stdLambdaSub <- variableStats[variableStats$measure == "lambda.std", ]
 Xcols <- grep("^X\\d+$", names(stdLambdaSub), value = TRUE)
 get_means <- function(P, miItems, data) {
-  
+
   P <- as.integer(P); miItems <- as.integer(miItems)
-  
+
   if (miItems == 0) {
     manip_idx   <- c(integer(0))
     unmanip_idx <- c(paste0("X", 1:P))
@@ -377,10 +427,10 @@ get_means <- function(P, miItems, data) {
     manip_idx   <- c(paste0("X", (P - miItems + 1):P))
     unmanip_idx <- c(paste0("X", 1:(P - miItems)))
   }
-  
+
   manip_mean   <- if (length(manip_idx)   == 0) NA_real_ else mean(data[manip_idx],   na.rm = TRUE)
   unmanip_mean <- if (length(unmanip_idx) == 0) NA_real_ else mean(data[unmanip_idx], na.rm = TRUE)
-  
+
   c(manip = manip_mean, unmanip = unmanip_mean)
 }
 
@@ -395,8 +445,40 @@ stdLambdaSub$manipulated <- res[,"manip"]
 stdLambdaSub$unManipulated <- res[,"unmanip"]
 
 # varT and R2 without any influence
-ggplot(variableStats[variableStats$measure == "lambda.std", ], 
-       aes(x = miItemsLevels, y = mean, group = P, 
+ggplot(variableStats[variableStats$measure == "lambda.std", ],
+       aes(x = miItemsLevels, y = mean, group = P,
            color = P, shape = P, fill = manipulated)) +
-  geom_jitter() + 
+  geom_jitter() +
   facet_grid(cAlpha ~  MIvio)
+
+
+# ################################################################################
+# # preliminary R2 comparisons (items vs. scores)
+# ################################################################################
+# # initial plots to compare R2 for items vs. scores (in linear regression)
+# plot(sampleStats[,"R2_items"], sampleStats[,"R2_score"])
+# # difference between items and score R2 (positive values: items > scores)
+# sampleStats$R2_diff <- sampleStats$R2_items - sampleStats$R2_score
+# sampleStats$R2_relDiff <- (sampleStats$R2_items - sampleStats$R2_score)/sampleStats$R2_sim 
+# 
+# sampleStats$MIvio <- factor(sampleStats$MIvio, 
+#                             levels = c("specific", "metric", "scalar"))
+# 
+# ggplot(sampleStats[sampleStats$cAlpha == 0.6 &
+#                      sampleStats$varT == 0.25, ], 
+#        aes(x = MIvio, y = R2_diff, group = interaction(miItemsPlot, P), 
+#            color = miItemsPlot, fill = miItemsPlot,
+#            linetype = P)) +
+#   geom_point() + 
+#   geom_line() + 
+#   facet_grid(R2 ~ corGO)
+# 
+# ggplot(sampleStats[sampleStats$cAlpha == 0.6 &
+#                      sampleStats$varT == 0.5, ], 
+#        aes(x = MIvio, y = R2_relDiff, group = interaction(miItemsPlot, P), 
+#            color = miItemsPlot, fill = miItemsPlot,
+#            linetype = P)) +
+#   geom_point() + 
+#   geom_line() + 
+#   facet_grid(R2 ~ corGO)
+# 
