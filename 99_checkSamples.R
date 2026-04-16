@@ -199,6 +199,33 @@ ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/checkY_nua
                 height = 9.60,
                 units = "in")
 
+sampleStats$varStable_lab <- ifelse(sampleStats$varT == 0.25, 0.5, 0.25)
+sampleStats$corGO_lab <- paste0("r[GY]==", sampleStats$corGO)
+sampleStats$cAlpha_lab <- paste0("alpha == ", sampleStats$cAlpha)
+dodge_w <- 0.5
+
+for (iMI in c("metric", "scalar")) {
+  pTmp <- ggplot(sampleStats[sampleStats$MIvio == iMI, ], 
+                           aes(x = factor(R2), y = varY_hat,
+                               group = interaction(factor(varStable_lab), factor(P)), shape = factor(P), 
+                               color = factor(varStable_lab))) +
+    geom_hline(yintercept = 0, colour = "black", linewidth = 0.4, alpha = 0.4) +
+    geom_point(position = position_dodge(width = dodge_w), size = 3, alpha = 0.7) +
+    scale_colour_grey(start = 0.5, end = 0.25, name = expression(sigma[specific]^2)) +
+    scale_shape_discrete(name = "P") +
+    labs(y = expression(Var(hat(Y))), x = expression(R[sim]^2)) +
+    facet_grid(cAlpha_lab ~ corGO_lab, labeller = label_parsed)
+  
+  (pTmp <- themeFunctionPaper(pTmp))
+  
+  ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/checkYhat_", iMI, ".png"),
+                  plot = yhatPlotScalar,
+                  width = 13.63,
+                  height = 9.60,
+                  units = "in")
+  
+}
+
 
 # ... correlation coefficient
 #     -> correlations slightly too small
