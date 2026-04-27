@@ -23,7 +23,7 @@ sampleData <- function() {
     }
     
     # simulate data + save parameter checks
-    checkFlag <- FALSE
+    checkFlag <- TRUE
     if (checkFlag) {N <- 20000}
     
     # simulate date from multivariate normal distribution
@@ -149,8 +149,7 @@ sampleData <- function() {
       }, error = function(e) {
         c(betaT_hat_g1 = NA, betaT_hat_g2 = NA, R2_hat_g1 = NA, R2_hat_g2 = NA)
       })
-      
-      
+    
       # save data and checks {variances, CronbachsAlpha}
       lm_modelSyntax <- paste0("Y ~ (1 +", paste(itemNames, sep = "", collapse = "+"), ")") # all items
       
@@ -162,6 +161,32 @@ sampleData <- function() {
       
       fitAvg <- lm(Y ~ avg, data = data)
       R2_avg <- summary(fitAvg)$r.squared
+      
+      # calculate standardized measures of measurement non-invariance
+      mMItest <- paste0("T =~ ", itemNames[1],
+             if (length(itemNames) > 1) {
+               paste0(" + ", paste(itemNames[-1], collapse = " + "))
+             } else {""})
+      
+      fit.config <- cfa(mMItest, data = data[,-c(1, 2)], group = "group")
+      fit.metric <- cfa(mMItest, data = data[,-c(1, 2)], group = "group", 
+                        group.equal = "loadings")
+      fit.scalar <- cfa(mMItest, data = data[,-c(1, 2)], group = "group", 
+                        group.equal = c("loadings","intercepts"))
+      
+      chisqDiff <- lavTestLRT(fit.config, fit.metric, fit.scalar)$`Chisq diff`
+      names(chisqDiff) <- c("config", "metric", "scalar")
+      
+      deltaCFI_metric <- fitMeasures(fit.metric, "cfi") - fitMeasures(fit.config, "cfi")
+      deltaRMSEA_metric <- fitMeasures(fit.metric, "rmsea") - fitMeasures(fit.config, "rmsea")
+      deltaSRMR_metric <- fitMeasures(fit.metric, "srmr") - fitMeasures(fit.config, "srmr")
+      
+      deltaCFI_scalar <- fitMeasures(fit.scalar, "cfi") - fitMeasures(fit.metric, "cfi")
+      deltaRMSEA_scalar <- fitMeasures(fit.scalar, "rmsea") - fitMeasures(fit.metric, "rmsea")
+      deltaSRMR_scalar <- fitMeasures(fit.scalar, "srmr") - fitMeasures(fit.metric, "srmr")
+      
+      # lavaan_edm_dmacs(fit.config)
+      dMACS <- dmacs::lavaan_dmacs(fit.config, RefGroup = "0")$DMACS
       
       checkList <- list(condition = c(P = P, Q = Q, cAlpha = cAlpha, varT = varT,
                                       miItems = miItems, corGO = corGO, R2 = R2, 
@@ -187,7 +212,18 @@ sampleData <- function() {
                         cAlpha_myFUN = cAlpha_myFUN, cAlpha_semTools = outSEM[["cAlpha_semTools"]],
                         # multiple group SEM estimates
                         # regression coefficients factor -- outcome
-                        betaT_hat_g1 = outSEMgroups["betaT_hat_g1"], betaT_hat_g2 = outSEMgroups["betaT_hat_g2"], 
+                        betaT_hat_g1 = outSEMgroups["betaT_hat_g1"], 
+                        betaT_hat_g2 = outSEMgroups["betaT_hat_g2"],
+                        # standardized measures of measurement non-invariance
+                        chisqDiff_metric = chisqDiff["metric"],
+                        chisqDiff_scalar = chisqDiff["scalar"],
+                        deltaCFI_metric = deltaCFI_metric,
+                        deltaRMSEA_metric = deltaRMSEA_metric, 
+                        deltaSRMR_metric = deltaSRMR_metric, 
+                        deltaCFI_scalar = deltaCFI_scalar, 
+                        deltaRMSEA_scalar = deltaRMSEA_scalar, 
+                        deltaSRMR_scalar = deltaSRMR_scalar,
+                        dMACS = dMACS,
                         # rsquared factor -- outcome
                         R2_hat_g1 = outSEMgroups["R2_hat_g1"], R2_hat_g2 = outSEMgroups["R2_hat_g2"]),
                         R2_fit = c(R2_items = R2_items, R2_score = R2_score, R2_avg = R2_avg))
