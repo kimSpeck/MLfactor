@@ -14,7 +14,7 @@ grid <- params[["dgp"]][["grid"]]
 ################################################################################
 # covariance outcome -- residualized scalar non-invariant item
 ################################################################################
-subGrid <- grid[grid$MIvio == "scalar" &
+subGrid <- grid[grid$MIvio %in% c("scalar", "scalarReal0.4", "scalarReal0.6") &
                   grid$miItems == 1,]
 
 # calculate var(y)
@@ -91,7 +91,8 @@ covPlotScalar <- ggplot(subGrid,
   scale_colour_grey(start = 0.5, end = 0.25, name = expression(sigma[specific]^2)) +
   scale_shape_discrete(name = "P") +
   labs(y = "cov(Ip, Y | S)", x = expression(R[sim]^2)) +
-  facet_grid(cAlpha_lab ~ corGO_lab, labeller = label_parsed)
+  #facet_grid(cAlpha_lab ~ corGO_lab, labeller = label_parsed)
+  facet_grid(MIvio ~ corGO_lab, labeller = label_parsed)
 
 (covPlotScalar <- themeFunctionPaper(covPlotScalar))
 
