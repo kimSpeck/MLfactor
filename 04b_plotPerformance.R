@@ -36,8 +36,12 @@ diffSub <- tidyr::separate(diffSub, model, into = c("predSet", "predMeth"),
 diffSub$predSet <- ifelse(is.na(diffSub$predSet), "items", diffSub$predSet)
 
 diffSub$R2 <- factor(diffSub$R2)
+diffSub$corNF <- ifelse(grepl("NF", diffSub$MIvio), 
+                        substr(diffSub$MIvio, 3, nchar(as.character(diffSub$MIvio[1]))), 
+                        0)
+diffSub$MIvio <- ifelse(grepl("NF", diffSub$MIvio), "NF", diffSub$MIvio)
 diffSub$MIvio <- factor(diffSub$MIvio, 
-                        levels = c("metric", "scalar", "specific", "nuanceFactor"), 
+                        levels = c("metric", "scalar", "specific", "NF"), 
                         labels = c("metric", "scalar", "nuance", "NF"))
 
 plotMeasureType <- "Rsquared_HOtest"
@@ -92,11 +96,11 @@ for (iVarT in varTvec) {
            ylab(paste0("R² difference (items - score)")) +
            facet_grid(corGO ~ R2)
         
-        pTmp <- themeFunctionPaper(pTmp)
+        (pTmp <- themeFunctionPaper(pTmp))
         
         plotName <- paste0(plotFolder, "/", plotPerformanceFolder, 
                            "/pDiffR2_Ho_", iPredSet, "_N", iN, "_varT", iVarT, 
-                           "_alpha", iAlpha, ".png")
+                           "_alpha", iAlpha, "_linePlots.png")
         
         ggplot2::ggsave(filename = plotName,
                         plot = pTmp,

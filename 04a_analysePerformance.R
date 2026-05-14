@@ -9,6 +9,8 @@ library(afex) # for aov_ez()
 library(effectsize) # for efect size calculation; generalized eta²
 library(emmeans)
 library(tidyverse)
+library(reshape2)
+library(ggplot2)
 
 resFolder <- "results"
 depFolder <- "dependentMeasures"
@@ -70,14 +72,18 @@ diffSub <- diffSub %>%
   mutate(ID = seq_len(n())) %>%
   ungroup()
 
-outVec <- colnames(diffSub)[grepl("diff", colnames(diffSub))]
-# outVec <- c("diff_LM", "diff_Ridge", "diff_ENET")
+subNoNF <- diffSub[!grepl("^NF0\\.", diffSub$MIvio), ]
+
+# outVec <- colnames(subNoNF)[grepl("diff", colnames(subNoNF))]
+outVec <- c("diff_LM", "diff_Ridge", "diff_ENET")
 for (iOut in outVec) {
   
   # ANOVA:
   anovaTmp <- aov_ez(id = "ID",
                          dv = iOut,
-                         data = diffSub[diffSub$MIvio != "nuanceFactor", ],
+                         # data = diffSub[diffSub$MIvio != "nuanceFactor", ],
+                         #data = diffSub[!grepl("^NF0\\.", diffSub$MIvio), ],
+                         data = subNoNF,
                          between = c("MIvio", "P", "cAlpha", "varT", "corGO", "R2",
                                      "miItemsPlot"),
                          within = "N")
@@ -164,11 +170,25 @@ diffSub2 <- diffSub %>%
   group_by(N, MIvio) %>%
   mutate(ID = seq_len(n())) %>%
   ungroup()
-    
-for (iMI in unique(diffSub2$MIvio)) {
+
+idxNF <- which(grepl("^NF", diffSub2$MIvio))
+diffSubNF <- diffSub2[idxNF,]
+diffSubNF$corNF <- as.factor(substr(diffSubNF$MIvio, 3, nchar(as.character(diffSubNF$MIvio[1]))))
+
+diffSubNF <- diffSubNF %>%
+  group_by(N) %>%
+  mutate(ID = seq_len(n())) %>%
+  ungroup()
+
+
+MIvec <- c("metric", "scalar", "specific")    
+# outVec <- colnames(diffSub2)[grepl("diff", colnames(diffSub2))]
+outVec <- c("diff_LM", "diff_Ridge", "diff_ENET")
+
+for (iMI in MIvec) {
   for (iOut in outVec) {
     
-    if (iMI != "nuanceFactor") {
+    if (iMI != "NF") {
       # ANOVA with miItemsPlot because multiple levels in factor
       anovaTmp <- aov_ez(id = "ID",
                          dv = iOut,
@@ -176,15 +196,21 @@ for (iMI in unique(diffSub2$MIvio)) {
                          between = c("P", "cAlpha", "varT", "corGO", "R2",
                                      "miItemsPlot"),
                          within = "N")
+      
     } else {
+      
       # ANOVA without miItemsPlot because only one level in factor
       anovaTmp <- aov_ez(id = "ID",
                          dv = iOut,
-                         data = diffSub2[diffSub2$MIvio == iMI,],
-                         between = c("P", "cAlpha", "varT", "corGO", "R2"),
+                         data = diffSubNF,
+                         between = c("P", "cAlpha", "varT", "corGO", "R2", "corNF"),
                          within = "N")
+      
     }
     
+    # investigate marginal means later
+    anovaObjectName <- paste0("anova_", iMI, "_", iOut)
+    assign(anovaObjectName, anovaTmp)
     
     eta2Tmp <- eta_squared(
       anovaTmp, # fitted model
@@ -204,6 +230,7 @@ for (iMI in unique(diffSub2$MIvio)) {
     # produce more results with these objects within this script later (paper tables, ...)
     etaObjectName <- paste0("eta2_", iMI, "_", iOut)
     assign(etaObjectName, eta2Tmp.ordered)
+    
     
     # produce overview plots for every ANOVA (combination of MLmeth x MIvio) 
     eta2Thresh <- 0.05
@@ -267,15 +294,12 @@ eta2TableCor <- eta2TableCor[, !naCols]
 
 # all correlations without nuanceFactor
 idxParamCol <- which(colnames(eta2TableCor) == "Parameter")
-idxNF <- which(grepl("nuanceFactor", colnames(eta2TableCor)))
+idxNF <- which(grepl("NF", colnames(eta2TableCor)))
 idx <- union(idxParamCol, idxNF)
 
 # test it
-kendallTau <- cor(eta2TableCor[, -idx], method = "kendall")
+kendallTau <- cor(eta2TableCor[, -idx], method = "kendall", use = "pairwise.complete.obs")
 corrplot::corrplot.mixed(kendallTau)
-
-kendallTau_NF <- cor(eta2TableCor[, idxNF], method = "kendall", use = "pairwise.complete.obs")
-corrplot::corrplot.mixed(kendallTau_NF)
 
 # # checK: without weights, the wdm package provides identical estimates as cor!
 # wdmKendallTau_NF <- wdm::wdm(eta2TableCor[, idxNF], method = "kendall")
@@ -298,15 +322,13 @@ corrplot::corrplot(wdmKendallTau_Diffs, order = 'hclust', addrect = 3,
                    addCoef.col = 'black', tl.srt = 45,
                    tl.cex = 0.9) # focus on your positive range) 
 
-library(reshape2)
-library(ggplot2)
-ord <- c("LM_specific", "ENET_specific","Ridge_specific",
-         "LM_metric", "ENET_metric","Ridge_metric",
+ord <- c("LM_metric", "ENET_metric","Ridge_metric",
+         "LM_specific", "ENET_specific","Ridge_specific",
          "LM_scalar","ENET_scalar","Ridge_scalar")
 wdmKendallTau_Diffs <- wdmKendallTau_Diffs[ord, ord]
-df <- melt(wdmKendallTau_Diffs, varnames = c("row", "col"), value.name = "tau")
-df$row <- factor(df$row, levels = rev(ord))
-df$col <- factor(df$col, levels = ord)
+plotTau <- melt(wdmKendallTau_Diffs, varnames = c("row", "col"), value.name = "tau")
+plotTau$row <- factor(plotTau$row, levels = rev(ord))
+plotTau$col <- factor(plotTau$col, levels = ord)
 
 # remove suffix for axis labels: "ENET_metric" -> "ENET"
 strip_suffix <- function(x) sub("_(metric|scalar|specific)$", "", x)
@@ -314,7 +336,7 @@ strip_suffix <- function(x) sub("_(metric|scalar|specific)$", "", x)
 # helper for header positions (tile centers)
 header_y <- length(ord) + 0.9  # above top row of tiles
 
-(pWeightedTau <- ggplot(df, aes(col, row, fill = tau)) +
+(pWeightedTau <- ggplot(plotTau, aes(col, row, fill = tau)) +
   geom_tile(color = "white", linewidth = 0.35) +
   geom_text(aes(label = sprintf("%.2f", tau)), size = 4) +
   # positive-only gradient (adjust limits to your range)
@@ -337,8 +359,8 @@ header_y <- length(ord) + 0.9  # above top row of tiles
   geom_vline(xintercept = c(3.5, 6.5), linewidth = 1.0, color = "grey20") +
   geom_hline(yintercept = c(3.5, 6.5), linewidth = 1.0, color = "grey20") +
   # add block headers (top)
-  annotate("text", x = 2, y = header_y, label = "Specific",   fontface = "bold", size = 4) +
-  annotate("text", x = 5, y = header_y, label = "Metric",   fontface = "bold", size = 4) +
+  annotate("text", x = 2, y = header_y, label = "Metric", fontface = "bold", size = 4) +
+  annotate("text", x = 5, y = header_y, label = "Specific", fontface = "bold", size = 4) +
   annotate("text", x = 8, y = header_y, label = "Scalar", fontface = "bold", size = 4))
 
 ggplot2::ggsave(filename = paste0(plotFolder, "/", plotAnovaFolder, "/weightedTau_difference.png"),
@@ -352,13 +374,6 @@ wdmKendallTau_groupDiffs <- wdm::wdm(eta2TableCor[, idxGroupDiffs], method = "ke
 colnames(wdmKendallTau_groupDiffs) <- rownames(wdmKendallTau_groupDiffs) <- substring(colnames(wdmKendallTau_groupDiffs), 6)
 corrplot::corrplot(wdmKendallTau_Diffs, order = 'hclust', addrect = 3, 
                    addCoef.col = 'black')
-
-wdmKendallTau_NF <- wdm::wdm(eta2TableCor[, idxNF], method = "kendall", 
-                             weights = linearWeights)
-colnames(wdmKendallTau_NF) <- rownames(wdmKendallTau_NF) <- substring(colnames(wdmKendallTau_NF), 6)
-corrplot::corrplot(wdmKendallTau_NF, order = 'hclust', addrect = 3, 
-                   addCoef.col = 'black')
-
 
 # 
 eta2Table <- tidyr::pivot_wider(eta2Table[,c("Parameter", "Eta2_generalized", "MLmeth", "MIvio")], 
@@ -424,10 +439,10 @@ texTable <- TMPeta2[TMPeta2$thresh == TRUE,!(colnames(TMPeta2) %in% c("thresh", 
 #                      grepl("diff_ENET", colnames(texTable)) | 
 #                      grepl("diff_LM", colnames(texTable))]]
 orderCols <- c("Parameter", 
-               paste0("diff_ENET", "_scalar"), paste0("diff_ENET", "_metric"),
-               paste0("diff_ENET", "_specific"), paste0("diff_ENET", "_nuanceFactor"),
-               paste0("diff_LM", "_scalar"), paste0("diff_LM", "_metric"),
-               paste0("diff_LM", "_specific"), paste0("diff_LM", "_nuanceFactor"))
+               paste0("diff_ENET", "_metric"), paste0("diff_ENET", "_scalar"),
+               paste0("diff_ENET", "_specific"), 
+               paste0("diff_LM", "_metric"), paste0("diff_LM", "_scalar"), 
+               paste0("diff_LM", "_specific"))
 texTable <- texTable[, orderCols]
 
 # formating: round to two
@@ -454,4 +469,4 @@ print(xtable::xtable(texTable, type = "latex"),
       file = paste0(plotFolder, "/ANOVA/betweenANOVA_", "ENET_LM","_", eta2Thresh, ".tex"), 
       include.rownames = FALSE, sanitize.text.function = identity)
 
-# ? estimate marginal means for different interaction conditions
+# estimate marginal means for interpretation of ANOVA omnibus tests
