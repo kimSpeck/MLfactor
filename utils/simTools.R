@@ -220,10 +220,13 @@ definePhi <- function(nLatentSEM, varT, varStable, varS, nItems, MIvio = F, miIt
 # Creates a diagonal residual matrix of size nItems*nGroups + nOutcome
 #   ... residuals of the outcome are zero as we use all latent formulation here 
 #       irreducible error of the outcome is already modeled elsewhere
-defineTheta <- function(varE, nItems, nGroups, nOutcome, nFactors = 1) {
+defineTheta <- function(varE, varEreal, nItems, miItems, nGroups, nOutcome, nFactors = 1) {
   ## input:
   # varE      - [scalar] residual variance of the manifest variables
+  # varEreal  - [scalar] residual variance of the non-invariant manifest variables
+  #                      (this values is only different from varE for MIvio = scalarReal)
   # nItems    - [scalar] number of items per group
+  # miItems   - [scalar] number of non-invariant items
   # nGroups   - [scalar] number of groups
   # nOutcome  - [scalar] number of outcome variables        
   ## output:
@@ -232,7 +235,10 @@ defineTheta <- function(varE, nItems, nGroups, nOutcome, nFactors = 1) {
   if (nFactors != 1) {
     stop("Kim, you still need to implement this!")
   }
-  return(diag(c(rep(varE, nItems * nGroups), rep(0, nOutcome * nGroups))))
+  return(diag(c(rep(c(rep(varE, nItems - miItems), 
+                      rep(varEreal, miItems)), 
+                    nGroups), rep(0, nOutcome * nGroups))))
+  # return(diag(c(rep(varE, nItems * nGroups), rep(0, nOutcome * nGroups))))
   
 }
 

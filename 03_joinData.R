@@ -19,6 +19,11 @@ fileVec <- list.files(resFolder, pattern = "^resFile_",
 # # code couldn't cope with naming convention; change file names automatically!
 # renameFiles <- sub("MIvioNF_", "MIvioNF", fileVec)
 # file.rename(paste0(resFolder, "/", fileVec), paste0(resFolder, "/", renameFiles))
+# fileVec <- list.files(resFolder, pattern = "^resFile_", 
+#                       include.dirs = FALSE, recursive = FALSE)
+
+# remove NF results
+fileVec <- fileVec[!grepl("MIvioNF", fileVec)]
 
 # get result object dimensions
 testSample <- readRDS(paste0(resFolder, "/", fileVec[1]))
@@ -117,9 +122,9 @@ performMeasures$diff_group_LM <- performMeasures$items_group_LM - performMeasure
 performMeasures$diff_group_Ridge <- performMeasures$items_group_Ridge - performMeasures$score_group_LM
 performMeasures$diff_group_ENET <- performMeasures$items_group_ENET - performMeasures$score_group_LM
 
-performMeasures$diff_combGroup_LM <- performMeasures$items_group_LM - performMeasures$comb_group_LM
-performMeasures$diff_combGroup_Ridge <- performMeasures$items_group_Ridge - performMeasures$comb_group_Ridge
-performMeasures$diff_combGroup_ENET <- performMeasures$items_group_ENET - performMeasures$comb_group_ENET
+# performMeasures$diff_combGroup_LM <- performMeasures$items_group_LM - performMeasures$comb_group_LM
+# performMeasures$diff_combGroup_Ridge <- performMeasures$items_group_Ridge - performMeasures$comb_group_Ridge
+# performMeasures$diff_combGroup_ENET <- performMeasures$items_group_ENET - performMeasures$comb_group_ENET
 
 performMeasures <- tidyr::pivot_longer(performMeasures, 
                                        cols = !c("MIvio", "miItems", "P", "Q", "cAlpha", "varT",

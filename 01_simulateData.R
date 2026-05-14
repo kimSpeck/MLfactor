@@ -31,6 +31,8 @@ createFolder(dataFolder)
 logFolder <- "log"
 createFolder(logFolder)
 
+createFolder("checkData")
+
 # set number of cores to use in parallel computing
 nCoresSampling <- 30 # simulate data
 
@@ -59,6 +61,7 @@ nCoresSampling <- 30 # simulate data
 grid <- params$dgp$grid
 # ! factors are interpreted as level numbers!; only character variables are interpreted by their name!
 str(grid) 
+# grid <- params$dgp$grid[which(params$dgp$grid$MIvio %in% paste0("NF_", params$dgp$corNuanceFactor)), ]
 
 # # sanity checks for data
 # params$sim$nSamples <- 1
@@ -71,7 +74,7 @@ str(grid)
 #                    params$dgp$grid$corGO == 0 &
 #                    params$dgp$grid$R2 == 0.8 &
 #                    params$dgp$grid$varT == 0.25 & # 0.25
-#                    params$dgp$grid$MIvio == "nuanceFactor")
+#                    params$dgp$grid$MIvio == "metric")
 # iCond <- condVec[1]
 # P <- params$dgp$grid$P[iCond]
 # Q <- params$dgp$grid$Q[iCond]
@@ -95,12 +98,48 @@ str(grid)
 # 
 # params$dgp$grid[iCond,]
 
+# testGrid <- grid[grid$MIvio == "scalar" &
+#                    grid$miItems == 1 & 
+#                    grid$cAlpha == 0.8 & 
+#                    grid$P == 4 & 
+#                    grid$corGO == 0.5 &
+#                    grid$R2 == 0.8, ]
+# 
+# testGrid <- rbind(testGrid, testGrid, testGrid, testGrid)
+# 
+# testGrid$b0 <- c(testGrid$b0[1:2], rep(0.8, 2), rep(0.6, 2), rep(0.4, 2)) 
+# testGrid$varEmi <- c(testGrid$varE[1:2], testGrid$varE[1:2] + rep(0.05, 2), 
+#                      testGrid$varE[1:2] + rep(0.1, 2), testGrid$varE[1:2] + rep(0.15, 2)) 
+# 
+# testGrid$varEmi <- params$dgp$varItems - testGrid$flT**2 * testGrid$varT - testGrid$b0**2 * params$dgp$varG
+# iCond <- 7
+# P <- testGrid$P[iCond]
+# Q <- testGrid$Q[iCond]
+# cAlpha <- testGrid$cAlpha[iCond]
+# varT <- testGrid$varT[iCond]
+# miItems <- testGrid$miItems[iCond]
+# corGO <- testGrid$corGO[iCond]
+# R2 <- testGrid$R2[iCond]
+# varStable <- testGrid$varStable[iCond]
+# flT <- testGrid$flT[iCond]
+# flS <- testGrid$flS[iCond]
+# varE <- testGrid$varE[iCond]
+# MIvio <- testGrid$MIvio[iCond]
+# b0 <- testGrid$b0[iCond]
+# b1 <- testGrid$b1[iCond]
+# betaT <- testGrid$betaT[iCond]
+# varS <- testGrid$varS[iCond]
+# betaS <- testGrid$betaS[iCond]
+# covNuanceFactor <- testGrid$covNuanceFactor[iCond]
+# varEmi <- testGrid$varEmi[iCond]
+# sampleSeed <- testGrid$sampleSeed[iCond]
+
 #####
 options(warn = -1)
 
 # sample data in parallel
 createData <- function(P, Q, cAlpha, varT, miItems, corGO, R2, varStable, flT, flS,
-                       varE, MIvio, b0, b1, betaT, varS, betaS, covNuanceFactor, sampleSeed){
+                       varE, MIvio, b0, b1, betaT, varS, betaS, covNuanceFactor, varEreal, sampleSeed){
   
   # checkFlag: check deviation of parameter estimates from true parameter values
   #            and get (estimated) standardized factor loadings 
@@ -132,7 +171,7 @@ createData <- function(P, Q, cAlpha, varT, miItems, corGO, R2, varStable, flT, f
   # I remove the specific item variance and instead model the MI violation with exactly
   #   the same variance as for the specific item variance
   #   thus, I do not need to adjust the residual variance of the MI violating item, right?
-  thetaSEM <- defineTheta(varE = varE, nItems = P, 
+  thetaSEM <- defineTheta(varE = varE, varEreal = varEreal, nItems = P, miItems = miItems, 
                           nGroups = params$dgp$nGroups, nOutcome = params$dgp$nOutcome)
   
   ##### structure model #####
@@ -186,6 +225,9 @@ createData <- function(P, Q, cAlpha, varT, miItems, corGO, R2, varStable, flT, f
 }
 
 # actually sample data (or save checks - checkFlag = T)
-out <- do.call(mapply, c(FUN = createData, grid))
+# grid[!grepl("^NF_", grid$MIvio),]
+# out <- do.call(mapply, c(FUN = createData, grid[!grepl("^NF_", grid$MIvio),]))
+# out <- do.call(mapply, c(FUN = createData, testGrid))
+out <- do.call(mapply, c(FUN = createData, grid[grepl("^scalarReal", grid$MIvio),]))
 
 options(warn = 0)

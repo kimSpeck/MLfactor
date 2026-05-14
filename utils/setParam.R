@@ -92,6 +92,10 @@ getCovNuance <- function(targetR, varS) {
   if (targetR < -1 || targetR > 1) stop("Correlation targetR must be in [-1, 1].")
   targetR * sqrt(varS * varS)
 }
+
+getVarE <- function(flT, varT, varItems, b0, varG) {
+  varItems - flT**2 * varT - b0**2 * varG
+}
 ################################################################################
 # simulation design 
 ################################################################################
@@ -155,12 +159,9 @@ params$dgp$flStable <- 1 # specific item variance
 #   enough variance left in the item to distribute on specific item variance and 
 #   residual variance! Thus, we arrive at negative residual variances which cannot
 #   exist in simulated or real data!
-# params$dgp$cAlpha <- c(0.6, 0.75, 0.9) 
-# params$dgp$cAlpha <- c(0.55, 0.7, 0.85) 
-# params$dgp$cAlpha <- c(0.6, 0.7, 0.8) # oder c(0.6, 0.8)
 params$dgp$cAlpha <- c(0.6, 0.8)
 
-# for c(0.6, 0.7, 0.8) we get two interesting boundary conditions
+# for c(0.6, 0.8) we get two interesting boundary conditions
 #   - one condition that closely matches McClure et al. (2024):
 #     4 items, alpha = 0.8, varT = 0.50, varS = 0.25, flT = 1.0000000, flS = 1, varE = 0.2500000
 #   - one condition in which we only have true factor and specific item variance
@@ -192,7 +193,6 @@ params$dgp$grid <- expand.grid(P = params$dgp$P, # nItems per factor
                                Q = params$dgp$Q, # nFactors
                                cAlpha = params$dgp$cAlpha, # Cronbach's Alpha
                                varT = params$dgp$varT, # true factor variance
-                               # miItems = seq_len(3), # number of MI violating items
                                miItems = 0:2, # number of MI violating items
                                corGO = params$dgp$rGroupOut, # correlation group -- outcome
                                R2 = params$dgp$R2) # explained variance outcome
@@ -205,7 +205,7 @@ params$dgp$grid <- expand.grid(P = params$dgp$P, # nItems per factor
 #                                  ifelse(params$dgp$grid$miItems == 2, 
 #                                         params$dgp$grid$P/2, 3*(params$dgp$grid$P/4)))  # number of items with deviation in factor loadings
 # 0 items to model no invariance violation or no "effect" in the respective condition
-params$dgp$grid$miItems = ifelse(params$dgp$grid$miItems == 2, params$dgp$grid$P/2, params$dgp$grid$miItems) 
+params$dgp$grid$miItems <- ifelse(params$dgp$grid$miItems == 2, params$dgp$grid$P/2, params$dgp$grid$miItems) 
 
 # here: differentiate between var{specific, metric, scalar} and actually varS 
 params$dgp$grid$varStable <- ifelse(params$dgp$grid$varT == 0.5, 0.25, 0.5)
@@ -298,25 +298,45 @@ params$dgp$grid$betaS <- ifelse(params$dgp$grid$MIvio != "specific", 0, params$d
 #   if the true DGP has only one group
 # params$dgp$varFLgrid$nGroups <- ifelse(params$dgp$varFLgrid$MIvio == "specific", 1, params$dgp$nGroups)
 
-# add condition with correlations between item-specific variance (only for nuance condition "specific")
-# this manipulation is only meaningful if miItems > 1
-# unique(params$dgp$grid$miItems)
+# # add condition with correlations between item-specific variance (only for nuance condition "specific")
+# # this manipulation is only meaningful if miItems > 1
+# # unique(params$dgp$grid$miItems)
+# 
+# params$dgp$grid$covNuanceFactor <- 0
+# 
+# params$dgp$corNuanceFactor <- c(.5, .7, .9)
+# 
+# for (iCorNF in params$dgp$corNuanceFactor){
+#   duplicate <- params$dgp$grid[params$dgp$grid$MIvio == "specific" &
+#                                  params$dgp$grid$miItems > 1, ]
+#   duplicate$MIvio <- paste0("NF_", iCorNF)
+#   duplicate$covNuanceFactor <- sapply(seq_len(dim(duplicate)[1]), function(iRow) {
+#     return(getCovNuance(targetR = iCorNF,
+#                         varS = params$dgp$grid$varS[iRow]))
+#   })
+#   params$dgp$grid <- rbind(params$dgp$grid, duplicate)
+# }
 
-params$dgp$grid$covNuanceFactor <- 0
+params$dgp$grid$varEreal <- params$dgp$grid$varE
 
-params$dgp$corNuanceFactor <- c(.5, .7, .9) 
+b0real <- c(.4, .6)
 
-for (iCorNF in params$dgp$corNuanceFactor){
-  duplicate <- params$dgp$grid[params$dgp$grid$MIvio == "specific" &
-                                 params$dgp$grid$miItems > 1, ]
-  duplicate$MIvio <- paste0("NF_", iCorNF)
-  duplicate$covNuanceFactor <- sapply(seq_len(dim(duplicate)[1]), function(iRow) {
-    return(getCovNuance(targetR = iCorNF, 
-                        varS = params$dgp$grid$varS[iRow]))
+for (ib0real in b0real){
+  duplicate <- params$dgp$grid[params$dgp$grid$MIvio == "scalar" &
+                                 params$dgp$grid$miItems >= 1, ]
+  duplicate$MIvio <- paste0("scalarReal", ib0real)
+  duplicate$b0 <- ib0real
+  duplicate$varEreal <- sapply(seq_len(dim(duplicate)[1]), function(iRow) {
+    return(getVarE(flT = duplicate$flT[iRow],
+                   varT = duplicate$varT[iRow],
+                   varItems = params$dgp$varItems, 
+                   b0 = ib0real,
+                   varG = params$dgp$varG))
   })
   params$dgp$grid <- rbind(params$dgp$grid, duplicate)
 }
 
+rm(duplicate, b0real)
 
 # create seed number for parallel cluster (reproducibility of generated data)
 #   keep seeds from simulating only linear effects and only add nonlinear conditions with seed
@@ -324,6 +344,7 @@ for (iCorNF in params$dgp$corNuanceFactor){
 set.seed(8967369)
 seedNum <- sample(1:999999999, dim(params$dgp$grid)[1], replace = FALSE) 
 params$dgp$grid$sampleSeed <- seedNum[1:dim(params$dgp$grid)[1]]
+
 ################################################################################
 # model fitting
 ################################################################################
@@ -358,3 +379,4 @@ params$fit$caretCrit <- "best" # not 1se
 # - The intercept is never penalized (when intercept=TRUE).
 params$fit$defaultPenalty <- 1
 params$fit$noPenalty <- 0
+
