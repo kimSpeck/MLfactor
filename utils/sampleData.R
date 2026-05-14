@@ -23,7 +23,7 @@ sampleData <- function() {
     }
     
     # simulate data + save parameter checks
-    checkFlag <- TRUE
+    checkFlag <- FALSE
     if (checkFlag) {N <- 20000}
     
     # simulate date from multivariate normal distribution
@@ -168,26 +168,43 @@ sampleData <- function() {
                paste0(" + ", paste(itemNames[-1], collapse = " + "))
              } else {""})
       
-      fit.config <- cfa(mMItest, data = data[,-c(1, 2)], group = "group")
-      fit.metric <- cfa(mMItest, data = data[,-c(1, 2)], group = "group", 
-                        group.equal = "loadings")
-      fit.scalar <- cfa(mMItest, data = data[,-c(1, 2)], group = "group", 
-                        group.equal = c("loadings","intercepts"))
+      outMItest <- tryCatch({
+        fit.config <- cfa(mMItest, data = data[,-c(1, 2)], group = "group")
+        fit.metric <- cfa(mMItest, data = data[,-c(1, 2)], group = "group", 
+                          group.equal = "loadings")
+        fit.scalar <- cfa(mMItest, data = data[,-c(1, 2)], group = "group", 
+                          group.equal = c("loadings","intercepts"))
+        
+        chisqDiff <- lavTestLRT(fit.config, fit.metric, fit.scalar)$`Chisq diff`
+        names(chisqDiff) <- c("config", "metric", "scalar")
+        
+        deltaCFI_metric <- fitMeasures(fit.metric, "cfi") - fitMeasures(fit.config, "cfi")
+        deltaRMSEA_metric <- fitMeasures(fit.metric, "rmsea") - fitMeasures(fit.config, "rmsea")
+        deltaSRMR_metric <- fitMeasures(fit.metric, "srmr") - fitMeasures(fit.config, "srmr")
+        
+        deltaCFI_scalar <- fitMeasures(fit.scalar, "cfi") - fitMeasures(fit.metric, "cfi")
+        deltaRMSEA_scalar <- fitMeasures(fit.scalar, "rmsea") - fitMeasures(fit.metric, "rmsea")
+        deltaSRMR_scalar <- fitMeasures(fit.scalar, "srmr") - fitMeasures(fit.metric, "srmr")
+        
+        # lavaan_edm_dmacs(fit.config)
+        dMACS <- dmacs::lavaan_dmacs(fit.config, RefGroup = "0")$DMACS
+        
+        list(chisqDiff = chisqDiff, deltaCFI_metric = deltaCFI_metric, 
+             deltaRMSEA_metric = deltaRMSEA_metric, deltaSRMR_metric = deltaSRMR_metric, 
+             deltaCFI_scalar = deltaCFI_scalar, 
+             deltaRMSEA_scalar = deltaRMSEA_scalar, deltaSRMR_scalar = deltaSRMR_scalar,
+             dMACS = dMACS)
+        
+      }, error = function(e) {
+        chisqDiff <- rep(NA, 3)
+        names(chisqDiff) <- c("config", "metric", "scalar")
+        list(chisqDiff = chisqDiff, 
+             deltaCFI_metric = NA, deltaRMSEA_metric = NA, deltaSRMR_metric = NA, 
+             deltaCFI_scalar = NA, deltaRMSEA_scalar = NA, deltaSRMR_scalar = NA,
+             dMACS = rep(NA, P))
+      })
       
-      chisqDiff <- lavTestLRT(fit.config, fit.metric, fit.scalar)$`Chisq diff`
-      names(chisqDiff) <- c("config", "metric", "scalar")
-      
-      deltaCFI_metric <- fitMeasures(fit.metric, "cfi") - fitMeasures(fit.config, "cfi")
-      deltaRMSEA_metric <- fitMeasures(fit.metric, "rmsea") - fitMeasures(fit.config, "rmsea")
-      deltaSRMR_metric <- fitMeasures(fit.metric, "srmr") - fitMeasures(fit.config, "srmr")
-      
-      deltaCFI_scalar <- fitMeasures(fit.scalar, "cfi") - fitMeasures(fit.metric, "cfi")
-      deltaRMSEA_scalar <- fitMeasures(fit.scalar, "rmsea") - fitMeasures(fit.metric, "rmsea")
-      deltaSRMR_scalar <- fitMeasures(fit.scalar, "srmr") - fitMeasures(fit.metric, "srmr")
-      
-      # lavaan_edm_dmacs(fit.config)
-      dMACS <- dmacs::lavaan_dmacs(fit.config, RefGroup = "0")$DMACS
-      
+      # save data
       checkList <- list(condition = c(P = P, Q = Q, cAlpha = cAlpha, varT = varT,
                                       miItems = miItems, corGO = corGO, R2 = R2, 
                                       MIvio = MIvio),
@@ -214,19 +231,21 @@ sampleData <- function() {
                         # regression coefficients factor -- outcome
                         betaT_hat_g1 = outSEMgroups["betaT_hat_g1"], 
                         betaT_hat_g2 = outSEMgroups["betaT_hat_g2"],
-                        # standardized measures of measurement non-invariance
-                        chisqDiff_metric = chisqDiff["metric"],
-                        chisqDiff_scalar = chisqDiff["scalar"],
-                        deltaCFI_metric = deltaCFI_metric,
-                        deltaRMSEA_metric = deltaRMSEA_metric, 
-                        deltaSRMR_metric = deltaSRMR_metric, 
-                        deltaCFI_scalar = deltaCFI_scalar, 
-                        deltaRMSEA_scalar = deltaRMSEA_scalar, 
-                        deltaSRMR_scalar = deltaSRMR_scalar,
-                        dMACS = dMACS,
                         # rsquared factor -- outcome
                         R2_hat_g1 = outSEMgroups["R2_hat_g1"], R2_hat_g2 = outSEMgroups["R2_hat_g2"]),
-                        R2_fit = c(R2_items = R2_items, R2_score = R2_score, R2_avg = R2_avg))
+                        R2_fit = c(R2_items = R2_items, R2_score = R2_score, R2_avg = R2_avg),
+                        # standardized measures of measurement non-invariance
+                        miTest = c(
+                          chisqDiff_metric = outMItest$chisqDiff["metric"],
+                          chisqDiff_scalar = outMItest$chisqDiff["scalar"],
+                          deltaCFI_metric = outMItest$deltaCFI_metric,
+                          deltaRMSEA_metric = outMItest$deltaRMSEA_metric, 
+                          deltaSRMR_metric = outMItest$deltaSRMR_metric, 
+                          deltaCFI_scalar = outMItest$deltaCFI_scalar, 
+                          deltaRMSEA_scalar = outMItest$deltaRMSEA_scalar, 
+                          deltaSRMR_scalar = outMItest$deltaSRMR_scalar,
+                          dMACS = outMItest$dMACS
+                        ))
     }
     
     # save files
@@ -242,10 +261,12 @@ sampleData <- function() {
   
   # only save check measures (this does not save the generated data)
   if (checkFlag) {
+    #fileName <- paste0("checkData_MIvio", MIvio, "_miItems", miItems, "_P", P, 
     fileName <- paste0("checkData_MIvio", MIvio, "_miItems", miItems, "_P", P, 
                        "_Q", Q, "_cAlpha", cAlpha, "_varT", varT, "_corGO", corGO, 
                        "_R2", R2, ".rda")
-    save(data, file = paste0(dataFolder, conditionFolder, "/", fileName))
+    #save(data, file = paste0(dataFolder, conditionFolder, "/", fileName))
+    save(data, file = paste0("checkData/", fileName))
   }
   
 }
