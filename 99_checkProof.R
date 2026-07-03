@@ -14,7 +14,7 @@ grid <- params[["dgp"]][["grid"]]
 ################################################################################
 # covariance outcome -- residualized scalar non-invariant item
 ################################################################################
-subGrid <- grid[grid$MIvio %in% c("scalar", "scalarReal0.4", "scalarReal0.6") &
+subGrid <- grid[grid$MIvio == "scalar" &
                   grid$miItems == 1,]
 
 # calculate var(y)
@@ -91,16 +91,15 @@ covPlotScalar <- ggplot(subGrid,
   scale_colour_grey(start = 0.5, end = 0.25, name = expression(sigma[specific]^2)) +
   scale_shape_discrete(name = "P") +
   labs(y = "cov(Ip, Y | S)", x = expression(R[sim]^2)) +
-  #facet_grid(cAlpha_lab ~ corGO_lab, labeller = label_parsed)
-  facet_grid(MIvio ~ corGO_lab, labeller = label_parsed)
+  facet_grid(cAlpha_lab ~ corGO_lab, labeller = label_parsed)
 
 (covPlotScalar <- themeFunctionPaper(covPlotScalar))
 
-ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/covIY_scalar.png"),
-                plot = covPlotScalar,
-                width = 13.63,
-                height = 9.60,
-                units = "in")
+# ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/covIY_scalar.png"),
+#                 plot = covPlotScalar,
+#                 width = 13.63,
+#                 height = 9.60,
+#                 units = "in")
 
 
 (covPlotScalar2 <- ggplot(subGrid, 
@@ -116,11 +115,11 @@ ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/covIY_scal
 
 (covPlotScalar2 <- themeFunctionPaper(covPlotScalar2))
 
-ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/covIY_scalar2.png"),
-                plot = covPlotScalar2,
-                width = 13.63,
-                height = 9.60,
-                units = "in")
+# ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/covIY_scalar2.png"),
+#                 plot = covPlotScalar2,
+#                 width = 13.63,
+#                 height = 9.60,
+#                 units = "in")
 
 ################################################################################
 # covariance outcome -- residualized metric non-invariant item
@@ -201,11 +200,11 @@ range(subGrid_M$gamma)
 range(subGrid_M$covYresI)
 which(subGrid_M$covYresI < 0) %in% idxVarE0
 
-ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/covIY_metric.png"),
-                plot = covPlotMetric,
-                width = 13.63,
-                height = 9.60,
-                units = "in")
+# ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/covIY_metric.png"),
+#                 plot = covPlotMetric,
+#                 width = 13.63,
+#                 height = 9.60,
+#                 units = "in")
 
 (covPlotMetric2 <- ggplot(subGrid_M, 
                           aes(x = factor(R2), y = covYresI,
@@ -220,11 +219,11 @@ ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/covIY_metr
 
 (covPlotMetric2 <- themeFunctionPaper(covPlotMetric2))
 
-ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/covIY_metric2.png"),
-                plot = covPlotMetric2,
-                width = 13.63,
-                height = 9.60,
-                units = "in")
+# ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/covIY_metric2.png"),
+#                 plot = covPlotMetric2,
+#                 width = 13.63,
+#                 height = 9.60,
+#                 units = "in")
 
 (covPlotMetric <- ggplot(subGrid_M, 
                         aes(x = factor(corGO), y = covIY_S_Hetero,
@@ -239,8 +238,9 @@ ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/covIY_metr
 
 (covPlotMetric <- themeFunctionPaper(covPlotMetric))
 
-ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/covIY_metric_clear.png"),
-                plot = covPlotMetric,
-                width = 13.63,
-                height = 9.60,
-                units = "in")
+# ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/covIY_metric_clear.png"),
+#                 plot = covPlotMetric,
+#                 width = 13.63,
+#                 height = 9.60,
+#                 units = "in")
+
