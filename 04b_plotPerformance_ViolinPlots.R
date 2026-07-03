@@ -20,6 +20,80 @@ load(resFile)
 unique(performMeasures$model)
 
 ################################################################################
+# descriptive statistics
+################################################################################
+dataSub <- performMeasures[performMeasures$measure_type == "Rsquared_HOtest" &
+                  performMeasures$model == "diff_ENET",]
+
+range(dataSub$values)
+
+stats <- dataSub %>% 
+  group_by(MIvio, P, cAlpha, varT, corGO, R2, N, miItemsPlot) %>% 
+  summarize(M = mean(values, na.rm = T), 
+            SD = sd(values, na.rm = T), 
+            min = min(values, na.rm = T), 
+            max = max(values, na.rm = T)) %>% 
+  arrange(desc(M))
+
+minMean <- min(stats$M)
+maxMean <- max(stats$M)
+meanMean <- mean(stats$M)
+medianMean <- median(stats$M)
+q25 <- quantile(stats$M, probs = .25)
+q75 <- quantile(stats$M, probs = .75)
+p05 <- quantile(stats$M, probs = .05)
+p95 <- quantile(stats$M, probs = .95)
+
+ggplot(stats, aes(x = M)) +
+  geom_histogram(
+    aes(y = after_stat(density)),
+    bins = 40,
+    color = "white",
+    fill = "grey70"
+  ) +
+  geom_density(linewidth = 1) +
+  labs(
+    x = expression(Delta*R^2~"condition-level mean"),
+    y = "Density"
+  ) +
+  theme_classic()
+
+
+dim(stats[stats$M > 0.01, ])[1]/dim(stats)[1]
+dim(stats[stats$M > 0.02, ])[1]/dim(stats)[1]
+dim(stats[stats$M > 0.05, ])[1]/dim(stats)[1]
+dim(stats[stats$M > 0.1, ])[1]/dim(stats)[1]
+dim(stats[stats$M > 0.15, ])[1]/dim(stats)[1]
+
+dim(stats[stats$MIvio != "specific" & stats$M > 0.01, ])[1]/dim(stats)[1]
+dim(stats[stats$MIvio != "specific" & stats$M > 0.02, ])[1]/dim(stats)[1]
+dim(stats[stats$MIvio != "specific" & stats$M > 0.05, ])[1]/dim(stats)[1]
+dim(stats[stats$MIvio != "specific" & stats$M > 0.1, ])[1]/dim(stats)[1]
+dim(stats[stats$MIvio != "specific" & stats$M > 0.15, ])[1]/dim(stats)[1]
+
+range(stats[!(stats$MIvio %in% c("specific", "scalar")), "M"])
+plot(stats[!(stats$MIvio %in% c("specific", "scalar")),]$M)
+stats[!(stats$MIvio %in% c("specific", "scalar")) & stats$M > 0.05, ]
+dim(stats[!(stats$MIvio %in% c("specific", "scalar")) & stats$M > 0.05, ])[1]/dim(stats)[1]
+
+ggplot(stats[stats$MIvio != "specific",], aes(x = M)) +
+  geom_histogram(
+    aes(y = after_stat(density)),
+    bins = 40,
+    color = "white",
+    fill = "grey70"
+  ) +
+  geom_density(linewidth = 1) +
+  labs(
+    x = expression(Delta*R^2~"condition-level mean"),
+    y = "Density"
+  ) +
+  theme_classic()
+
+plot(stats$M)
+plot(stats[stats$MIvio != "specific",]$M)
+
+################################################################################
 # difference plots (paper selection)
 ################################################################################
 diffSub <- performMeasures[performMeasures$measure_type == "Rsquared_HOtest" &
@@ -43,10 +117,12 @@ if (any(grepl("NF", diffSub$MIvio))){
   diffSub$MIvio <- ifelse(grepl("NF", diffSub$MIvio), "NF", diffSub$MIvio)
 }
 
+diffSub <- diffSub[!(diffSub$MIvio %in% c("scalarReal0.4", "scalarReal0.6")), ]
 diffSub$MIvio <- factor(diffSub$MIvio, 
-                        levels = c("metric", "scalarReal0.4", "scalarReal0.6", 
-                                   "scalar", "specific"), 
-                        labels = c("metric", "scalar (s)", "scalar (m)", "scalar", "nuance"))
+                        levels = c("metric", "scalar", "specific"), 
+                        labels = c("Metric", "Scalar", "Nuance"))
+
+
 
 diffSub$corGO_lab <- paste0("r[GY]==", diffSub$corGO)
 diffSub$R2_lab    <- paste0("R[sim]^2==", diffSub$R2)
@@ -64,18 +140,18 @@ diffSub$x_nested <- interaction(diffSub$miItemsPlot, diffSub$MIvio, sep = "|",
                                 lex.order = FALSE)
 
 levels(diffSub$x_nested)
-diffSub$effectSize <- ifelse(diffSub$MIvio %in% c("metric", "nuance"), "", 
-                             ifelse(diffSub$MIvio == "scalar", "xl", 
-                                    ifelse(diffSub$MIvio == "scalar (s)", "s", "m")))
-
-diffSub$MIvioPlot <- factor(diffSub$MIvio, 
-                            levels = c("metric", "scalar (s)", "scalar (m)",
-                                       "scalar", "nuance"), 
-                            labels = c("metric", "scalar", "scalar", "scalar", "nuance"))
-diffSub$x_nested2 <- interaction(diffSub$miItemsPlot, diffSub$MIvioPlot, diffSub$effectSize, 
-                                 sep = "|", lex.order = FALSE)
-levels(diffSub$x_nested2)
-unique(diffSub$x_nested2)
+# diffSub$effectSize <- ifelse(diffSub$MIvio %in% c("metric", "nuance"), "", 
+#                              ifelse(diffSub$MIvio == "scalar (XL)", "XL", 
+#                                     ifelse(diffSub$MIvio == "scalar (S)", "S", "M")))
+# 
+# diffSub$MIvioPlot <- factor(diffSub$MIvio, 
+#                             levels = c("metric", "scalar (S)", "scalar (M)",
+#                                        "scalar (XL)", "nuance"), 
+#                             labels = c("metric", "scalar", "scalar", "scalar", "nuance"))
+# diffSub$x_nested2 <- interaction(diffSub$miItemsPlot, diffSub$MIvioPlot, diffSub$effectSize, 
+#                                  sep = "|", lex.order = FALSE)
+# levels(diffSub$x_nested2)
+# unique(diffSub$x_nested2)
 
 varTvec <- unique(diffSub$varT)
 predSetVec <- unique(diffSub$predSet)
@@ -84,7 +160,7 @@ cAlphaVec <- unique(diffSub$cAlpha)
 Pvec <- unique(diffSub$P)
 
 # # test it: items_1000_0.25_0.8
-# iVarT <- 0.25
+# iVarT <- 0.5
 # iPredSet <- "items" # "group"
 # iN <- 300
 # iAlpha <- 0.8
@@ -95,23 +171,8 @@ colVecViridis <- c("#addd8e", "#1f9e89", "#1d4f91")
 # colVecViridis <- c("#337538", "#0072B2", "#CC79A7")
 # colVec <- c( "#006400", "#FF7F50", "#B22222") 
 
-# range(diffSub[diffSub$MIvio != "NF" & 
-#                 diffSub$predSet == "items" , ]$values)
-# # -0.1668824  0.2610356
-# 
-# range(diffSub[diffSub$MIvio != "NF" & 
-#                 diffSub$N == 300 & 
-#                 diffSub$predSet == "items" , ]$values)
-# # -0.02515503  0.26101686
-# 
-# range(diffSub[diffSub$MIvio != "NF" & 
-#                 diffSub$predSet != "items" , ]$values)
-# # -0.3472198  0.2715301
-# 
-# range(diffSub[diffSub$MIvio != "NF" & 
-#                 diffSub$N == 300 & 
-#                 diffSub$predSet != "items" , ]$values)
-# # -0.2801884  0.2610176 
+aggregate(diffSub[diffSub$MIvio != "NF", ], 
+          values ~ predSet + varT, range)
 
 # identical scaling for all result plots (to a certain degree)
 ylims_items    <- c(-0.17, 0.28)
@@ -157,14 +218,21 @@ for (iVarT in varTvec) {
               breaks = levels(diffSub$x_nested),
               labels = sub("\\|.*$", "", levels(diffSub$x_nested)),
               guide = guide_axis_nested(
+                # key = key_range_manual(
+                #   start = c(1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34, 37, 40, 43),
+                #   end   = c(3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45),
+                #   name  = c("metric", "\nS", "scalar\nM", "\nXL", "nuance",
+                #             "metric", "\nS", "scalar\nM", "\nXL", "nuance",
+                #             "metric", "\nS", "scalar\nM", "\nXL", "nuance")
+                # )
                 key = key_range_manual(
-                  start = c(1, 4, 6, 8, 11, 14, 17, 19, 21, 24, 27, 30, 32, 34, 37),
-                  end   = c(3, 5, 7, 10, 13, 16, 18, 20, 23, 26, 29, 31, 33, 36, 39),
-                  name  = c("metric", "\ns", "scalar\nm", "\nxl", "nuance",
-                            "metric", "\ns", "scalar\nm", "\nxl", "nuance",
-                            "metric", "\ns", "scalar\nm", "\nxl", "nuance")
+                  start = c(1, 4, 7, 10, 13, 16, 19, 22, 25),
+                  end   = c(3, 6, 9, 12, 15, 18, 21, 24, 27),
+                  name  = c("Metric", "Scalar", "Nuance",
+                            "Metric", "Scalar", "Nuance",
+                            "Metric", "Scalar", "Nuance")
                 )
-              )
+              ), drop = FALSE
             ) +
             # scale_x_discrete(
             #   breaks = levels(diffSub$x_nested2),
