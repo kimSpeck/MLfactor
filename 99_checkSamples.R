@@ -154,8 +154,33 @@ range(miTestStats$deltaChiSquare_scalar, na.rm = T)
 range(abs(miTestStats$deltaCFI_scalar), na.rm = T)
 
 miTestStats$miItems <- ifelse(miTestStats$miItems > 1, "50%", miTestStats$miItems)
+miTestStats$MIvio <- factor(miTestStats$MIvio, 
+                            levels = c("metric", "scalarReal0.4", "scalarReal0.6", "scalar", "specific"), 
+                            labels = c("metric", "scalar (S)", "scalar (M)", "scalar (XL)", "nuance"))
+
+miTestStats$deltaCFI <- ifelse(miTestStats$MIvio == "metric", 
+                               miTestStats$deltaCFI_metric, miTestStats$deltaCFI_scalar)
 
 dodge_w <- 1
+
+pDeltaCFI <- ggplot(miTestStats, 
+                    aes(x = factor(miItems), y = abs(deltaCFI),
+                        group = interaction(factor(varT), factor(cAlpha)), shape = factor(cAlpha), 
+                        color = factor(varT))) +
+  geom_hline(yintercept = 0, colour = "black", linewidth = 0.4, alpha = 0.4) +
+  geom_point(position = position_dodge(width = dodge_w), size = 3, alpha = 0.7) +
+  scale_colour_grey(start = 0.5, end = 0.25, name = expression(sigma[F]^2)) +
+  scale_shape_discrete(name = expression(alpha)) +
+  labs(y = expression(Delta~"CFI"), x = "number of manipulated Items") + 
+  facet_grid(P ~ MIvio, labeller = labeller(P = function(x) paste("P =", x)))
+(pDeltaCFI <- themeFunctionPaper(pDeltaCFI))
+
+# ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/checkMI_deltaCFI.png"),
+#                 plot = pDeltaCFI,
+#                 width = 13.63,
+#                 height = 9.60,
+#                 units = "in")
+
 # plot delta CFI for metric & scalar non-invariance
 # corGO & R2 don't make any difference!
 pDeltaCFI_metric <- ggplot(miTestStats[miTestStats$MIvio == "metric", ], 
@@ -168,13 +193,13 @@ pDeltaCFI_metric <- ggplot(miTestStats[miTestStats$MIvio == "metric", ],
   scale_shape_discrete(name = expression(alpha)) +
   labs(y = expression(Delta[CFI]), x = "number of manipulated Items") + 
   facet_grid( ~ P, labeller = labeller(P = function(x) paste("P =", x)))
-pDeltaCFI_metric <- themeFunctionPaper(pDeltaCFI_metric)
+(pDeltaCFI_metric <- themeFunctionPaper(pDeltaCFI_metric))
 
-ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/checkMI_deltaCFImetric.png"),
-                plot = pDeltaCFI_metric,
-                width = 13.63,
-                height = 9.60,
-                units = "in")
+# ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/checkMI_deltaCFImetric.png"),
+#                 plot = pDeltaCFI_metric,
+#                 width = 13.63,
+#                 height = 9.60,
+#                 units = "in")
 
 pDeltaCFI_scalar <- ggplot(miTestStats[miTestStats$MIvio %in% c("scalar", "scalarReal0.4", "scalarReal0.6"), ], 
        aes(x = factor(miItems), y = abs(deltaCFI_scalar),
@@ -186,13 +211,13 @@ pDeltaCFI_scalar <- ggplot(miTestStats[miTestStats$MIvio %in% c("scalar", "scala
   scale_shape_discrete(name = expression(alpha)) +
   labs(y = expression(Delta[CFI]), x = "number of manipulated Items") + 
   facet_grid(P ~ MIvio, labeller = labeller(P = function(x) paste("P =", x)))
-pDeltaCFI_scalar <- themeFunctionPaper(pDeltaCFI_scalar)
+(pDeltaCFI_scalar <- themeFunctionPaper(pDeltaCFI_scalar))
 
-ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/checkMI_deltaCFIscalar.png"),
-                plot = pDeltaCFI_scalar,
-                width = 13.63,
-                height = 9.60,
-                units = "in")
+# ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/checkMI_deltaCFIscalar.png"),
+#                 plot = pDeltaCFI_scalar,
+#                 width = 13.63,
+#                 height = 9.60,
+#                 units = "in")
 
 # plot dMACS for metric & scalar non-invariance
 subDMACS <- tidyr::pivot_longer(miTestStats, cols = starts_with("dMACS"), 
@@ -215,14 +240,17 @@ pDMACS <- ggplot(subDMACS[manipulatedItems,],
   labs(y = expression(d[MACS]), x = "number of manipulated Items") + 
   facet_grid(~ MIvio)
 
-pDMACS <- themeFunctionPaper(pDMACS)
+(pDMACS <- themeFunctionPaper(pDMACS))
 
-ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/checkMI_dMACS.png"),
-                plot = pDMACS,
-                width = 13.63,
-                height = 9.60,
-                units = "in")
+# ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/checkMI_dMACS.png"),
+#                 plot = pDMACS,
+#                 width = 13.63,
+#                 height = 9.60,
+#                 units = "in")
 
+# check plot for all items without simulated effects
+# dMACS should be near zero for all these items in all of these conditions
+# not aesthetically pleasing! only manipulation check kind of graphic!
 ggplot(subDMACS[-manipulatedItems,], 
        aes(x = factor(miItems), y = abs(dMACS),
            group = interaction(factor(varT), factor(cAlpha)), shape = factor(cAlpha), 
@@ -234,8 +262,16 @@ ggplot(subDMACS[-manipulatedItems,],
   labs(y = expression(d[MACS]), x = "number of manipulated Items") + 
   facet_grid( ~ MIvio)
 
+# # save effect sizes to file to create a plot with all effect size distributions
+# #   across all simulation conditions
+# resFolder <- "results"
+# depFolder <- "dependentMeasures"
+# createFolder(paste0(resFolder, "/", depFolder))
+# save(miTestStats, file = paste0(resFolder, "/", depFolder, "/miEffectSizes_dMACS.rda"))
+
 ################################################################################
-# plot standardized factor loadings
+# manipulation checks on single variable level!  
+# also standardized factor loading plots
 ################################################################################
 variableStats <- as.data.frame(do.call(rbind, variableStats))
 colnames(variableStats) <- c("MIvio", "miItems", "P", "Q", "cAlpha", "varT", "corGO", "R2",
@@ -253,6 +289,7 @@ variableStats$sd <- matrixStats::rowSds(as.matrix(variableStats[, itemNames], nc
 
 unique(variableStats$measure)
 
+# # nuanceFactor conditions are irrelevant 
 # variableStats$corNF <- ifelse(grepl("NF", variableStats$MIvio), 
 #                               substr(variableStats$MIvio, 3, nchar(as.character(variableStats$MIvio[1]))), 
 #                               0)
@@ -305,11 +342,14 @@ ggplot(variableStats[variableStats$miItems == "0" &
            color = interaction(P, R2), fill = interaction(P, R2))) +
   geom_jitter()
 
+################################################################################
+# plot standardized factor loadings
+################################################################################
 # examine standardized factor loadings
 variableStats$miItemsLevels <- ifelse(variableStats$miItems > 1, 2, variableStats$miItems)
 variableStats$MIvio <- factor(variableStats$MIvio,
-                              levels = c("metric", "scalar", "scalarReal0.4", "scalarReal0.6", "specific"),
-                              labels = c("metric", "scalar", "scalar (s)", "scalar (m)", "nuance"))
+                              levels = c("metric", "scalarReal0.4", "scalarReal0.6", "scalar", "specific"),
+                              labels = c("metric", "scalar (S)", "scalar (M)", "scalar (XL)", "nuance"))
 ggplot(variableStats[variableStats$measure == "lambda.std", ],
        aes(x = miItemsLevels, y = mean, group = P,
            color = P, shape = P)) +
@@ -331,10 +371,17 @@ stdLambdaSub_long$miItemsLevels <- factor(stdLambdaSub_long$miItemsLevels,
                                           levels = c(0, 1, 2),
                                           labels = c("0", "1", "50%"))
 
+# descriptive statistics
+aggregate(flT.std ~ P + cAlpha, 
+          data = stdLambdaSub_long[stdLambdaSub_long$miItemsLevels == 0,], 
+          FUN = mean)
+
+# generate plot
 (stdFL_perItem <- ggplot(stdLambdaSub_long,
-                         aes(x = miItemsLevels, y = flT.std, group = P,
+                         aes(x = miItemsLevels, y = flT.std,
+                             group = interaction(P, manipulated),
                              color = manipulated, shape = P, fill = manipulated)) +
-    geom_jitter() +
+    geom_jitter(width = 0.4, height = 0) +
     facet_grid(cAlpha ~  MIvio) +
     scale_color_manual(values = c("#D55E00", "#0072B2")) +
     scale_y_continuous(breaks = scales::breaks_width(0.1)) +
@@ -444,16 +491,40 @@ length(naIdx)
 #     -> solid at 0.25 for every condition
 plot(sampleStats$varG_hat)
 
+# calculate standardized regression weight for nuance effects
+unique(sampleStats$varT)
+sampleStats$varS <- ifelse(sampleStats$varT == "0.25", 0.5, 0.25)
+sampleStats$betaS.std <- 1 * (sqrt(sampleStats$varS) / sqrt(sampleStats$varY_hat))
+sampleStats$varS <- factor(sampleStats$varS)
+
+sampleStats$corNF <- ifelse(grepl("NF", sampleStats$MIvio), 
+                            substr(sampleStats$MIvio, 3, nchar(as.character(sampleStats$MIvio[1]))), 
+                            0)
+sampleStats$MIvio <- ifelse(grepl("NF", sampleStats$MIvio), "NF", sampleStats$MIvio)
+sampleStats$miItemsPlot <- ifelse(sampleStats$miItems > 1, "P/2", sampleStats$miItems)
+sampleStats$miItemsLabels <- paste0("# nuances: ", sampleStats$miItems)
+
+(stdCoef_nuances <- ggplot(sampleStats[sampleStats$MIvio == "specific" & 
+                                         sampleStats$miItems != 0, ],
+                            aes(x = corGO, y = betaS.std, group = interaction(varS, R2),
+                                color = R2 , shape = varS)) +
+    geom_jitter(size = 3, height = 0, width = 0.05) +
+    scale_colour_grey(start = 0.8, end = 0.2, name = expression(R^2)) +
+    scale_shape_discrete(name = expression(Var("S"))) +
+    facet_grid( ~ miItemsLabels))
+
+
+(stdCoef_nuances <- themeFunctionPaper(stdCoef_nuances))
+
+# ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/nuanceEffectSizes_betaSTD.png"),
+#                 plot = stdCoef_nuances,
+#                 width = 13.63,
+#                 height = 9.60,
+#                 units = "in")
+
 # check simulated ...
 # ... variance of the outcome variable
 plot(sampleStats$varY_hat)
-
-sampleStats$corNF <- ifelse(grepl("NF", sampleStats$MIvio), 
-                        substr(sampleStats$MIvio, 3, nchar(as.character(sampleStats$MIvio[1]))), 
-                        0)
-sampleStats$MIvio <- ifelse(grepl("NF", sampleStats$MIvio), "NF", sampleStats$MIvio)
-sampleStats$miItemsPlot <- ifelse(sampleStats$miItems > 1, "P/2", sampleStats$miItems)
-
 
 # P & cAlpha essentially irrelevant
 (yHatplot_MI <- ggplot(sampleStats[sampleStats$MIvio %in% c("metric", "scalar", "scalarReal0.4", "scalarReal0.6"), ], 
