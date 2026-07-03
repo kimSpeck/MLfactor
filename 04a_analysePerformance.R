@@ -1,7 +1,5 @@
 # load parameters & custom functions 
 source("utils/setParam.R") # parameter values
-params$sim$nTrain <- 100
-
 source("utils/utilityFUNS.R")
 
 # calculate ANOVA for difference in R² to check for effects of manipulated variables in simulation 
@@ -42,6 +40,12 @@ col2fac <- c("MIvio", "P", "Q", "cAlpha", "varT", "corGO", "R2", "sample", "N",
              "measure_type", "miItemsPlot", "model")
 diffSub[col2fac] <- lapply(diffSub[col2fac], factor)
 
+# remove small non-invariance effect sizes (not full factorial)
+diffSub <- diffSub[!(diffSub$MIvio %in% c("scalarReal0.4", "scalarReal0.6")), ]
+
+# get ANOVA result without the large effect size condition varT = 0.25
+unique(diffSub$varT)
+diffSub <- diffSub[diffSub$varT == 0.5, ]
 ################################################################################
 # mixed ANOVA for difference in R² between items and score
 ################################################################################
@@ -84,8 +88,10 @@ for (iOut in outVec) {
                          # data = diffSub[diffSub$MIvio != "nuanceFactor", ],
                          #data = diffSub[!grepl("^NF0\\.", diffSub$MIvio), ],
                          data = subNoNF,
-                         between = c("MIvio", "P", "cAlpha", "varT", "corGO", "R2",
-                                     "miItemsPlot"),
+                         # between = c("MIvio", "P", "cAlpha", "varT", "corGO", "R2",
+                         #             "miItemsPlot"),
+                     between = c("MIvio", "P", "cAlpha", "corGO", "R2",
+                                 "miItemsPlot"),
                          within = "N")
   
   eta2Tmp <- eta_squared(
@@ -193,7 +199,9 @@ for (iMI in MIvec) {
       anovaTmp <- aov_ez(id = "ID",
                          dv = iOut,
                          data = diffSub2[diffSub2$MIvio == iMI,],
-                         between = c("P", "cAlpha", "varT", "corGO", "R2",
+                         # between = c("P", "cAlpha", "varT", "corGO", "R2",
+                         #             "miItemsPlot"),
+                         between = c("P", "cAlpha", "corGO", "R2",
                                      "miItemsPlot"),
                          within = "N")
       
@@ -203,7 +211,8 @@ for (iMI in MIvec) {
       anovaTmp <- aov_ez(id = "ID",
                          dv = iOut,
                          data = diffSubNF,
-                         between = c("P", "cAlpha", "varT", "corGO", "R2", "corNF"),
+                         # between = c("P", "cAlpha", "varT", "corGO", "R2", "corNF"),
+                         between = c("P", "cAlpha", "corGO", "R2", "corNF"),
                          within = "N")
       
     }
@@ -468,5 +477,3 @@ texTable[idxNum] <- lapply(texTable[idxNum], drop0)
 print(xtable::xtable(texTable, type = "latex"),
       file = paste0(plotFolder, "/ANOVA/betweenANOVA_", "ENET_LM","_", eta2Thresh, ".tex"), 
       include.rownames = FALSE, sanitize.text.function = identity)
-
-# estimate marginal means for interpretation of ANOVA omnibus tests
