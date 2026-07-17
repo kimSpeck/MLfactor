@@ -35,14 +35,52 @@ stats <- dataSub %>%
             max = max(values, na.rm = T)) %>% 
   arrange(desc(M))
 
-minMean <- min(stats$M)
-maxMean <- max(stats$M)
-meanMean <- mean(stats$M)
-medianMean <- median(stats$M)
-q25 <- quantile(stats$M, probs = .25)
-q75 <- quantile(stats$M, probs = .75)
-p05 <- quantile(stats$M, probs = .05)
-p95 <- quantile(stats$M, probs = .95)
+stats$varS <- ifelse(stats$varT == 0.25, 0.5, 0.25)
+stats <- stats[!(stats$MIvio %in% c("scalarReal0.4", "scalarReal0.6")),]
+dodge_w <- 1
+
+pMeanDifferences <- ggplot(stats, 
+      aes(x = factor(corGO), y = M,
+          group = interaction(factor(varS), factor(R2)), shape = factor(varS), 
+          color = factor(R2))) +
+  geom_hline(yintercept = 0, colour = "black", linewidth = 0.4, alpha = 0.4) +
+  geom_point(position = position_dodge(width = dodge_w), size = 3, alpha = 0.7) +
+  scale_colour_grey(start = 0.5, end = 0.25, name = expression(R^2)) +
+  scale_shape_discrete(name = expression(sigma[S]^{2})) +
+  labs(y = expression(Delta*R^2~"(items - score)"), x = expression(rho[GY])) + 
+  facet_grid(miItemsPlot ~ MIvio, )
+
+(pMeanDifferences <- themeFunctionPaper(pMeanDifferences))
+
+# calculate descriptive statistics
+funList <- list(mean = mean, median = median, sd = sd, min = min, max = max, 
+                p05 = function(data) quantile(data, probs = .05),
+                q25 = function(data) quantile(data, probs = .25),
+                q75 = function(data) quantile(data, probs = .75), 
+                p95 = function(data) quantile(data, probs = .95))
+
+# overall
+descriptive <- lapply(names(funList), function(iFun) {
+  agg <- aggregate(M ~ 1, 
+                   data = stats, 
+                   FUN = funList[[iFun]])
+  names(agg)[names(agg) == "M"] <- iFun
+  agg
+})
+
+statsVec <- unlist(descriptive)
+
+# varT = 0.5
+descriptiveVarT <- lapply(names(funList), function(iFun) {
+  agg <- aggregate(M ~ 1, 
+                   data = stats[stats$varT == 0.5,], 
+                   FUN = funList[[iFun]])
+  names(agg)[names(agg) == "M"] <- iFun
+  agg
+})
+
+(statsVecVarT <- unlist(descriptiveVarT))
+
 
 ggplot(stats, aes(x = M)) +
   geom_histogram(
@@ -125,7 +163,7 @@ diffSub$MIvio <- factor(diffSub$MIvio,
 
 
 diffSub$corGO_lab <- paste0("r[GY]==", diffSub$corGO)
-diffSub$R2_lab    <- paste0("R[sim]^2==", diffSub$R2)
+diffSub$R2_lab    <- paste0("R[F]^2==", diffSub$R2)
 dodge_w <- 1
 
 diffSub <- diffSub[diffSub$MIvio != "NF",]
@@ -140,18 +178,6 @@ diffSub$x_nested <- interaction(diffSub$miItemsPlot, diffSub$MIvio, sep = "|",
                                 lex.order = FALSE)
 
 levels(diffSub$x_nested)
-# diffSub$effectSize <- ifelse(diffSub$MIvio %in% c("metric", "nuance"), "", 
-#                              ifelse(diffSub$MIvio == "scalar (XL)", "XL", 
-#                                     ifelse(diffSub$MIvio == "scalar (S)", "S", "M")))
-# 
-# diffSub$MIvioPlot <- factor(diffSub$MIvio, 
-#                             levels = c("metric", "scalar (S)", "scalar (M)",
-#                                        "scalar (XL)", "nuance"), 
-#                             labels = c("metric", "scalar", "scalar", "scalar", "nuance"))
-# diffSub$x_nested2 <- interaction(diffSub$miItemsPlot, diffSub$MIvioPlot, diffSub$effectSize, 
-#                                  sep = "|", lex.order = FALSE)
-# levels(diffSub$x_nested2)
-# unique(diffSub$x_nested2)
 
 varTvec <- unique(diffSub$varT)
 predSetVec <- unique(diffSub$predSet)
@@ -172,10 +198,11 @@ colVecViridis <- c("#addd8e", "#1f9e89", "#1d4f91")
 # colVec <- c( "#006400", "#FF7F50", "#B22222") 
 
 aggregate(diffSub[diffSub$MIvio != "NF", ], 
-          values ~ predSet + varT, range)
+          values ~ varT + N + predSet, range)
 
 # identical scaling for all result plots (to a certain degree)
 ylims_items    <- c(-0.17, 0.28)
+ylims_varT05    <- c(-0.06, 0.11)
 ylims_itemsLargeN    <- c(-0.06, 0.28)
 ylims_group <- c(-0.35, 0.28)
 
@@ -266,7 +293,11 @@ for (iVarT in varTvec) {
           
           if (iPredSet == "items") {
             if (iN > 100) {
-              ylims <- ylims_itemsLargeN
+              if (iVarT == 0.25) {
+                ylims <- ylims_itemsLargeN
+              } else {
+                ylims <- ylims_varT05
+              }
             } else {
               ylims <- ylims_items
             }
@@ -276,7 +307,7 @@ for (iVarT in varTvec) {
           
           pTmp <- pTmp + coord_cartesian(ylim = ylims) +
             scale_y_continuous(
-              breaks = seq(floor(ylims[1]*5)/5, ceiling(ylims[2]*5)/5, by = 0.2)
+              breaks = seq(floor(ylims[1]*5)/5, ceiling(ylims[2]*5)/5, by = 0.1)
             )
           
           (pTmp <- themeFunctionPaper(pTmp))
@@ -326,7 +357,7 @@ diffSub$MIvio <- factor(diffSub$MIvio,
                         labels = c("metric", "scalar", "nuance", "NF"))
 
 diffSub$corGO_lab <- paste0("r[GY]==", diffSub$corGO)
-diffSub$R2_lab    <- paste0("R[sim]^2==", diffSub$R2)
+diffSub$R2_lab    <- paste0("R[F]^2==", diffSub$R2)
 dodge_w <- 1
 
 diffSub <- diffSub[diffSub$MIvio != "NF",]
