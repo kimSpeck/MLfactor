@@ -62,7 +62,7 @@ effectSizeData <- merge(subDMACS, subGrid_N[, commonColumns], by = commonColumns
 effectSizeData <- effectSizeData[effectSizeData$miItems > 0, ]
 unique(effectSizeData$MIvio)
 
-psych::describeBy(d ~ MIvio + R2 + corGO + miItems, data = effectSizeData)
+# psych::describeBy(d ~ MIvio + R2 + corGO + miItems, data = effectSizeData)
 
 ################################################################################
 # plot effect sizes (overview)
@@ -72,6 +72,9 @@ dodge_w <- 0.5
 
 effectSizeData$varS <- factor(ifelse(effectSizeData$varT == 0.25, 0.5, 0.25))
 effectSizeData$miItemsLabels <- paste0("# Items: ", effectSizeData$miItems)
+
+# # save effect size data as it is
+# save(effectSizeData, file = paste0(resFolder, "/", depFolder, "/paperEffectSizes.rda"))
 
 # metric also differes depending on Cronbachs alpha which is not visualized by 
 #     any graphic feature 
@@ -119,12 +122,31 @@ ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/paperEffec
                 height = 9.60,
                 units = "in")
 
-aggregate(effectSizeData[!(effectSizeData$MIvio %in% c("scalar (S)", "scalar (M)")), ], 
-          d ~ MIvio + varT, mean)
-aggregate(effectSizeData[!(effectSizeData$MIvio %in% c("scalar (S)", "scalar (M)")), ], 
-          d ~ MIvio + varT, sd)
-aggregate(effectSizeData[!(effectSizeData$MIvio %in% c("scalar (S)", "scalar (M)")), ], 
-          d ~ MIvio + varT, median)
-aggregate(effectSizeData[!(effectSizeData$MIvio %in% c("scalar (S)", "scalar (M)")), ], 
-          d ~ MIvio + varT, range)
+# get descriptive statistics
+funList <- list(mean = mean, sd = sd, median = median)
+
+descriptive <- lapply(names(funList), function(iFun) {
+  agg <- aggregate(d ~ MIvio + varT, 
+                   data = effectSizeData[!(effectSizeData$MIvio %in% c("scalar (S)", "scalar (M)")), ], 
+                   FUN = funList[[iFun]])
+  names(agg)[names(agg) == "d"] <- iFun
+  agg
+})
+
+descRange <- aggregate(effectSizeData[!(effectSizeData$MIvio %in% c("scalar (S)", "scalar (M)")), ], 
+                       d ~ MIvio + varT, range)
+descRange <- data.frame(MIvio = descRange$MIvio,
+                        varT  = descRange$varT,
+                        min   = descRange$d[, 1],
+                        max   = descRange$d[, 2])
+
+descStats_EffectSizes <- Reduce(function(a, b) merge(a, b, by = c("MIvio", "varT")),
+                                c(descriptive, list(descRange)))
+
+descStats_EffectSizes$varS <- ifelse(descStats_EffectSizes$varT == 0.25, 0.5, 0.25)
+
+# resFolder <- "results"
+# depFolder <- "dependentMeasures"
+# createFolder(paste0(resFolder, "/", depFolder))
+# save(descStats_EffectSizes)
 
