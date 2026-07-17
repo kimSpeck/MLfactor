@@ -78,7 +78,7 @@ subGrid$covYresI <- subGrid$covIY - subGrid$gamma * subGrid$covYS
 shapeVec <- c(3, 4)
 dodge_w <- 0.5
 subGrid$corGO_lab <- paste0("r[GY]==", subGrid$corGO)
-subGrid$R2_lab    <- paste0("R[sim]^2==", subGrid$R2)
+subGrid$R2_lab    <- paste0("R[F]^2==", subGrid$R2)
 subGrid$P_lab <- paste0("P == ", subGrid$P)
 subGrid$cAlpha_lab <- paste0("alpha == ", subGrid$cAlpha)
 
@@ -90,7 +90,7 @@ covPlotScalar <- ggplot(subGrid,
   geom_point(position = position_dodge(width = dodge_w), size = 3, alpha = 0.7) +
   scale_colour_grey(start = 0.5, end = 0.25, name = expression(sigma[specific]^2)) +
   scale_shape_discrete(name = "P") +
-  labs(y = "cov(Ip, Y | S)", x = expression(R[sim]^2)) +
+  labs(y = "cov(Ip, Y | Score)", x = expression(R[F]^2)) +
   facet_grid(cAlpha_lab ~ corGO_lab, labeller = label_parsed)
 
 (covPlotScalar <- themeFunctionPaper(covPlotScalar))
@@ -110,7 +110,7 @@ covPlotScalar <- ggplot(subGrid,
   geom_point(position = position_dodge(width = dodge_w), size = 3, alpha = 0.7) +
   scale_colour_grey(start = 0.5, end = 0.25, name = expression(sigma[specific]^2)) +
   scale_shape_discrete(name = "P") +
-  labs(y = expression("cov(Y, Ip - "~beta[S]~"S)"), x = expression(R[sim]^2)) +
+  labs(y = expression("cov(Y, Ip - "~beta[Score]~"Score)"), x = expression(R[F]^2)) +
   facet_grid(cAlpha_lab ~ corGO_lab, labeller = label_parsed))
 
 (covPlotScalar2 <- themeFunctionPaper(covPlotScalar2))
@@ -171,7 +171,7 @@ subGrid_M$covYresI <- subGrid_M$covIY - subGrid_M$gamma * subGrid_M$covYS
 shapeVec <- c(3, 4)
 dodge_w <- 0.5
 subGrid_M$corGO_lab <- paste0("r[GY]==", subGrid_M$corGO)
-subGrid_M$R2_lab    <- paste0("R[sim]^2==", subGrid_M$R2)
+subGrid_M$R2_lab    <- paste0("R[F]^2==", subGrid_M$R2)
 subGrid_M$P_lab <- paste0("P == ", subGrid_M$P)
 subGrid_M$cAlpha_lab <- paste0("alpha == ", subGrid_M$cAlpha)
 
@@ -183,7 +183,7 @@ covPlotMetric <- ggplot(subGrid_M,
   geom_point(position = position_dodge(width = dodge_w), size = 3, alpha = 0.7) +
   scale_colour_grey(start = 0.5, end = 0.25, name = expression(sigma[specific]^2)) +
   scale_shape_discrete(name = "P") +
-  labs(y = "cov(Ip, Y | S)", x = expression(R[sim]^2)) +
+  labs(y = "cov(Ip, Y | Score)", x = expression(R[F]^2)) +
   facet_grid(cAlpha_lab ~ corGO_lab, labeller = label_parsed)
 
 (covPlotMetric <- themeFunctionPaper(covPlotMetric))
@@ -214,7 +214,7 @@ which(subGrid_M$covYresI < 0) %in% idxVarE0
     geom_point(position = position_dodge(width = dodge_w), size = 3, alpha = 0.7) +
     scale_colour_grey(start = 0.5, end = 0.25, name = expression(sigma[specific]^2)) +
     scale_shape_discrete(name = "P") +
-    labs(y = expression("cov(Y, Ip - "~beta[S]~"S)"), x = expression(R[sim]^2)) +
+    labs(y = expression("cov(Y, Ip - "~beta[Score]~"Score)"), x = expression(R[F]^2)) +
     facet_grid(cAlpha_lab ~ corGO_lab, labeller = label_parsed))
 
 (covPlotMetric2 <- themeFunctionPaper(covPlotMetric2))
@@ -233,7 +233,7 @@ which(subGrid_M$covYresI < 0) %in% idxVarE0
   geom_point(position = position_dodge(width = dodge_w), size = 3, alpha = 0.7) +
   scale_colour_grey(start = 0.5, end = 0.25, name = expression(sigma[specific]^2)) +
   scale_shape_discrete(name = "P") +
-  labs(y = "cov(Ip, Y | S)", x = expression(r[GY])) +
+  labs(y = "cov(Ip, Y | Score)", x = expression(r[GY])) +
   facet_grid(cAlpha_lab ~ R2_lab, labeller = label_parsed))
 
 (covPlotMetric <- themeFunctionPaper(covPlotMetric))

@@ -156,14 +156,14 @@ range(abs(miTestStats$deltaCFI_scalar), na.rm = T)
 miTestStats$miItems <- ifelse(miTestStats$miItems > 1, "50%", miTestStats$miItems)
 miTestStats$MIvio <- factor(miTestStats$MIvio, 
                             levels = c("metric", "scalarReal0.4", "scalarReal0.6", "scalar", "specific"), 
-                            labels = c("metric", "scalar (S)", "scalar (M)", "scalar (XL)", "nuance"))
+                            labels = c("Metric", "scalar (S)", "scalar (M)", "Scalar", "Nuance"))
 
-miTestStats$deltaCFI <- ifelse(miTestStats$MIvio == "metric", 
+miTestStats$deltaCFI <- ifelse(miTestStats$MIvio == "Metric", 
                                miTestStats$deltaCFI_metric, miTestStats$deltaCFI_scalar)
 
 dodge_w <- 1
 
-pDeltaCFI <- ggplot(miTestStats, 
+pDeltaCFI <- ggplot(miTestStats[!(miTestStats$MIvio %in% c("scalar (S)", "scalar (M)")),], 
                     aes(x = factor(miItems), y = abs(deltaCFI),
                         group = interaction(factor(varT), factor(cAlpha)), shape = factor(cAlpha), 
                         color = factor(varT))) +
@@ -183,7 +183,7 @@ pDeltaCFI <- ggplot(miTestStats,
 
 # plot delta CFI for metric & scalar non-invariance
 # corGO & R2 don't make any difference!
-pDeltaCFI_metric <- ggplot(miTestStats[miTestStats$MIvio == "metric", ], 
+pDeltaCFI_metric <- ggplot(miTestStats[miTestStats$MIvio == "Metric", ], 
        aes(x = factor(miItems), y = abs(deltaCFI_metric),
            group = interaction(factor(varT), factor(cAlpha)), shape = factor(cAlpha), 
            color = factor(varT))) +
@@ -201,7 +201,7 @@ pDeltaCFI_metric <- ggplot(miTestStats[miTestStats$MIvio == "metric", ],
 #                 height = 9.60,
 #                 units = "in")
 
-pDeltaCFI_scalar <- ggplot(miTestStats[miTestStats$MIvio %in% c("scalar", "scalarReal0.4", "scalarReal0.6"), ], 
+pDeltaCFI_scalar <- ggplot(miTestStats[miTestStats$MIvio %in% c("Scalar"), ], 
        aes(x = factor(miItems), y = abs(deltaCFI_scalar),
            group = interaction(factor(varT), factor(cAlpha)), shape = factor(cAlpha), 
            color = factor(varT))) +
@@ -223,6 +223,9 @@ pDeltaCFI_scalar <- ggplot(miTestStats[miTestStats$MIvio %in% c("scalar", "scala
 subDMACS <- tidyr::pivot_longer(miTestStats, cols = starts_with("dMACS"), 
                                 names_to = "item", names_prefix = "dMACS_", 
                                 values_to = "dMACS", values_drop_na = TRUE)
+
+unique(subDMACS$MIvio)
+subDMACS <- subDMACS[!(subDMACS$MIvio %in% c("scalar (S)", "scalar (M)")),]
 
 manipulatedItems <- c(which(subDMACS$P == 4 & subDMACS$miItems == 1 & subDMACS$item == "X4"), 
                       which(subDMACS$P == 8 & subDMACS$miItems == 1 & subDMACS$item == "X8"),
@@ -349,7 +352,7 @@ ggplot(variableStats[variableStats$miItems == "0" &
 variableStats$miItemsLevels <- ifelse(variableStats$miItems > 1, 2, variableStats$miItems)
 variableStats$MIvio <- factor(variableStats$MIvio,
                               levels = c("metric", "scalarReal0.4", "scalarReal0.6", "scalar", "specific"),
-                              labels = c("metric", "scalar (S)", "scalar (M)", "scalar (XL)", "nuance"))
+                              labels = c("Metric", "scalar (S)", "scalar (M)", "Scalar", "Nuance"))
 ggplot(variableStats[variableStats$measure == "lambda.std", ],
        aes(x = miItemsLevels, y = mean, group = P,
            color = P, shape = P)) +
@@ -377,7 +380,7 @@ aggregate(flT.std ~ P + cAlpha,
           FUN = mean)
 
 # generate plot
-(stdFL_perItem <- ggplot(stdLambdaSub_long,
+(stdFL_perItem <- ggplot(stdLambdaSub_long[!(stdLambdaSub_long$MIvio %in% c("scalar (S)", "scalar (M)")), ],
                          aes(x = miItemsLevels, y = flT.std,
                              group = interaction(P, manipulated),
                              color = manipulated, shape = P, fill = manipulated)) +
