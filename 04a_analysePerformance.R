@@ -43,9 +43,10 @@ diffSub[col2fac] <- lapply(diffSub[col2fac], factor)
 # remove small non-invariance effect sizes (not full factorial)
 diffSub <- diffSub[!(diffSub$MIvio %in% c("scalarReal0.4", "scalarReal0.6")), ]
 
-# get ANOVA result without the large effect size condition varT = 0.25
-unique(diffSub$varT)
-diffSub <- diffSub[diffSub$varT == 0.5, ]
+# # get ANOVA result without the large effect size condition varT = 0.25
+# unique(diffSub$varT)
+# diffSub <- diffSub[diffSub$varT == 0.5, ]
+
 ################################################################################
 # mixed ANOVA for difference in R² between items and score
 ################################################################################
@@ -88,10 +89,10 @@ for (iOut in outVec) {
                          # data = diffSub[diffSub$MIvio != "nuanceFactor", ],
                          #data = diffSub[!grepl("^NF0\\.", diffSub$MIvio), ],
                          data = subNoNF,
-                         # between = c("MIvio", "P", "cAlpha", "varT", "corGO", "R2",
-                         #             "miItemsPlot"),
-                     between = c("MIvio", "P", "cAlpha", "corGO", "R2",
-                                 "miItemsPlot"),
+                         between = c("MIvio", "P", "cAlpha", "varT", "corGO", "R2",
+                                     "miItemsPlot"),
+                     # between = c("MIvio", "P", "cAlpha", "corGO", "R2",
+                     #             "miItemsPlot"),
                          within = "N")
   
   eta2Tmp <- eta_squared(
@@ -199,10 +200,10 @@ for (iMI in MIvec) {
       anovaTmp <- aov_ez(id = "ID",
                          dv = iOut,
                          data = diffSub2[diffSub2$MIvio == iMI,],
-                         # between = c("P", "cAlpha", "varT", "corGO", "R2",
-                         #             "miItemsPlot"),
-                         between = c("P", "cAlpha", "corGO", "R2",
+                         between = c("P", "cAlpha", "varT", "corGO", "R2",
                                      "miItemsPlot"),
+                         # between = c("P", "cAlpha", "corGO", "R2",
+                         #             "miItemsPlot"),
                          within = "N")
       
     } else {
@@ -332,8 +333,8 @@ corrplot::corrplot(wdmKendallTau_Diffs, order = 'hclust', addrect = 3,
                    tl.cex = 0.9) # focus on your positive range) 
 
 ord <- c("LM_metric", "ENET_metric","Ridge_metric",
-         "LM_specific", "ENET_specific","Ridge_specific",
-         "LM_scalar","ENET_scalar","Ridge_scalar")
+         "LM_scalar","ENET_scalar","Ridge_scalar", 
+         "LM_specific", "ENET_specific","Ridge_specific")
 wdmKendallTau_Diffs <- wdmKendallTau_Diffs[ord, ord]
 plotTau <- melt(wdmKendallTau_Diffs, varnames = c("row", "col"), value.name = "tau")
 plotTau$row <- factor(plotTau$row, levels = rev(ord))
@@ -369,8 +370,8 @@ header_y <- length(ord) + 0.9  # above top row of tiles
   geom_hline(yintercept = c(3.5, 6.5), linewidth = 1.0, color = "grey20") +
   # add block headers (top)
   annotate("text", x = 2, y = header_y, label = "Metric", fontface = "bold", size = 4) +
-  annotate("text", x = 5, y = header_y, label = "Specific", fontface = "bold", size = 4) +
-  annotate("text", x = 8, y = header_y, label = "Scalar", fontface = "bold", size = 4))
+  annotate("text", x = 5, y = header_y, label = "Scalar", fontface = "bold", size = 4) +
+  annotate("text", x = 8, y = header_y, label = "Nuance", fontface = "bold", size = 4))
 
 ggplot2::ggsave(filename = paste0(plotFolder, "/", plotAnovaFolder, "/weightedTau_difference.png"),
                 plot = pWeightedTau,
