@@ -44,7 +44,6 @@ docs/
 
 # translation temp files
 po/*~
-oldCode/*
 log/*
 data/*
 results/*
