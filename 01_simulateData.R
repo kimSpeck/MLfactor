@@ -36,28 +36,6 @@ createFolder("checkData")
 # set number of cores to use in parallel computing
 nCoresSampling <- 30 # simulate data
 
-# grid to simulate data with mapply later
-#   simulation via mapply to easily simulate subsets of parameter combinations
-#   create factor structure for predictor variables to increase reliability
-# grid with ...
-# ... P = params$dgp$P # number of items per factor
-# ... Q = params$dgp$Q # number of factors
-# ... cAlpha = params$dgp$cAlpha # Cronbach's Alpha
-# ... varT = 
-# ... miItems = params$dgp$miItems # number of MI violating items
-# ... corGO = params$dgp$rGroupOut # correlation group -- outcome
-# ... R2 = 
-# ... varStable =
-# ... flT
-# ... flS
-# ... varE
-# ... MIvio = params$dgp$MIvio # measurement invariance violations
-# ... b0
-# ... b1
-# ... betaT
-# ... varS
-# ... betaS
-
 grid <- params$dgp$grid
 # ! factors are interpreted as level numbers!; only character variables are interpreted by their name!
 str(grid) 
@@ -67,37 +45,37 @@ str(grid)
 # params$sim$nSamples <- 1
 
 ##### test it #####
-# test simulation condition that crushes SEM estimation
-condVec <- which(params$dgp$grid$P == 8 &
-                   params$dgp$grid$cAlpha == 0.6 & # 0.6
-                   params$dgp$grid$miItems == 4 &
-                   params$dgp$grid$corGO == 0 &
-                   params$dgp$grid$R2 == 0.8 &
-                   params$dgp$grid$varT == 0.25 & # 0.25
-                   params$dgp$grid$MIvio == "specific")
-iCond <- condVec[1]
-P <- params$dgp$grid$P[iCond]
-Q <- params$dgp$grid$Q[iCond]
-cAlpha <- params$dgp$grid$cAlpha[iCond]
-varT <- params$dgp$grid$varT[iCond]
-miItems <- params$dgp$grid$miItems[iCond]
-corGO <- params$dgp$grid$corGO[iCond]
-R2 <- params$dgp$grid$R2[iCond]
-varStable <- params$dgp$grid$varStable[iCond]
-flT <- params$dgp$grid$flT[iCond]
-flS <- params$dgp$grid$flS[iCond]
-varE <- params$dgp$grid$varE[iCond]
-MIvio <- params$dgp$grid$MIvio[iCond]
-b0 <- params$dgp$grid$b0[iCond]
-b1 <- params$dgp$grid$b1[iCond]
-betaT <- params$dgp$grid$betaT[iCond]
-varS <- params$dgp$grid$varS[iCond]
-betaS <- params$dgp$grid$betaS[iCond]
-covNuanceFactor <- params$dgp$grid$covNuanceFactor[iCond]
-sampleSeed <- grid$sampleSeed[iCond]
-varEreal <- grid$varEreal[iCond]
-
-params$dgp$grid[iCond,]
+# # test simulation condition that crushes SEM estimation
+# condVec <- which(params$dgp$grid$P == 8 &
+#                    params$dgp$grid$cAlpha == 0.6 & # 0.6
+#                    params$dgp$grid$miItems == 4 &
+#                    params$dgp$grid$corGO == 0 &
+#                    params$dgp$grid$R2 == 0.8 &
+#                    params$dgp$grid$varT == 0.25 & # 0.25
+#                    params$dgp$grid$MIvio == "specific")
+# iCond <- condVec[1]
+# P <- params$dgp$grid$P[iCond]
+# Q <- params$dgp$grid$Q[iCond]
+# cAlpha <- params$dgp$grid$cAlpha[iCond]
+# varT <- params$dgp$grid$varT[iCond]
+# miItems <- params$dgp$grid$miItems[iCond]
+# corGO <- params$dgp$grid$corGO[iCond]
+# R2 <- params$dgp$grid$R2[iCond]
+# varStable <- params$dgp$grid$varStable[iCond]
+# flT <- params$dgp$grid$flT[iCond]
+# flS <- params$dgp$grid$flS[iCond]
+# varE <- params$dgp$grid$varE[iCond]
+# MIvio <- params$dgp$grid$MIvio[iCond]
+# b0 <- params$dgp$grid$b0[iCond]
+# b1 <- params$dgp$grid$b1[iCond]
+# betaT <- params$dgp$grid$betaT[iCond]
+# varS <- params$dgp$grid$varS[iCond]
+# betaS <- params$dgp$grid$betaS[iCond]
+# covNuanceFactor <- params$dgp$grid$covNuanceFactor[iCond]
+# sampleSeed <- grid$sampleSeed[iCond]
+# varEreal <- grid$varEreal[iCond]
+# 
+# params$dgp$grid[iCond,]
 
 # testGrid <- grid[grid$MIvio == "scalar" &
 #                    grid$miItems == 1 & 
@@ -227,9 +205,6 @@ createData <- function(P, Q, cAlpha, varT, miItems, corGO, R2, varStable, flT, f
 }
 
 # actually sample data (or save checks - checkFlag = T)
-# grid[!grepl("^NF_", grid$MIvio),]
-# out <- do.call(mapply, c(FUN = createData, grid[!grepl("^NF_", grid$MIvio),]))
-# out <- do.call(mapply, c(FUN = createData, testGrid))
-out <- do.call(mapply, c(FUN = createData, grid[grepl("^scalarReal", grid$MIvio),]))
+out <- do.call(mapply, c(FUN = createData, grid[!grepl("^NF_", grid$MIvio),]))
 
 options(warn = 0)

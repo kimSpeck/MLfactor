@@ -33,34 +33,12 @@ nCoresSampling <- 20
 # grid <- params$dgp$grid[which(params$dgp$grid$MIvio %in% paste0("NF_", params$dgp$corNuanceFactor)), ]
 grid <- params$dgp$grid[which(params$dgp$grid$MIvio %in% paste0("scalarReal", c(0.4, 0.6))), ]
 
-# # check which conditions are already fitted
-# listResFiles <- list.files(resFolder)
-# fittedConds <- matrix(NA, ncol = 8, nrow = length(listResFiles))
-# rowIDX <- rep(NA, length(listResFiles))
-# for (iFile in seq_along(listResFiles)) {
-#   tmpCond <- matrix(unlist(parseFilename(listResFiles[iFile])), ncol = 8, nrow = 1)
-#   names(tmpCond) <- c("MIvio", "miItems", "P", "Q", "cAlpha", "varT", "corGO", "R2")
-#   fittedConds[iFile,] <- tmpCond
-#   rowIDX[iFile] <- rownames(grid[grid$MIvio == tmpCond["MIvio"] &
-#           grid$miItems == tmpCond["miItems"] &
-#           grid$P == tmpCond["P"] &
-#           grid$Q == tmpCond["Q"] &
-#           grid$cAlpha == tmpCond["cAlpha"] &
-#           grid$varT == tmpCond["varT"] &
-#           grid$corGO == tmpCond["corGO"] &
-#           grid$R2 == tmpCond["R2"],])
-# }
-# # sort(as.numeric(rowIDX)) # first 142 rows in condition grid are fitted
-# grid <- grid[!(rownames(grid) %in% rowIDX), ]
-
 # only load biggest dataset! draw random subsamples and fit smaller subsets
 # this is done to avoid excessive memory requirements to save the data!
 
 # prediction based on linear regression and based on elastic net regression
 #   ... prediction based on items and based on composite
 #   ... prediction based on predictor set with group, without group, with group predicted from items
-
-params$sim$nTrain <- 100
 
 results <- lapply(seq_len(nrow(grid)), function(iSim) {
   
@@ -93,7 +71,6 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
                    "; first Sample at ", format(Sys.time(), "%d%m%y_%H%M%S")))  
     } 
     
-    # here: load actually simulated data! object names?!
     # load training and holdout test data for single sample rda files
     # load training sample
     trainSample <- loadRData(paste0(dataFolder, "/", conditionFolder, "/sample_", iSample, ".rda"))
@@ -208,7 +185,7 @@ results <- lapply(seq_len(nrow(grid)), function(iSim) {
       
     })
     
-    # here: combine results for every subsampled N 
+    # combine results for every subsampled N 
     # save condition information!
     # save sample number! 
     resAllN <- vector(mode = "list", 3)

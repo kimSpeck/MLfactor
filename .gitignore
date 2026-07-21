@@ -48,6 +48,7 @@ oldCode/*
 log/*
 data/*
 results/*
+checkData/*
 
 # RStudio Connect folder
 rsconnect/

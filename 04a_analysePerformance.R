@@ -79,20 +79,15 @@ diffSub <- diffSub %>%
 
 subNoNF <- diffSub[!grepl("^NF0\\.", diffSub$MIvio), ]
 
-# outVec <- colnames(subNoNF)[grepl("diff", colnames(subNoNF))]
 outVec <- c("diff_LM", "diff_Ridge", "diff_ENET")
 for (iOut in outVec) {
   
   # ANOVA:
   anovaTmp <- aov_ez(id = "ID",
                          dv = iOut,
-                         # data = diffSub[diffSub$MIvio != "nuanceFactor", ],
-                         #data = diffSub[!grepl("^NF0\\.", diffSub$MIvio), ],
                          data = subNoNF,
                          between = c("MIvio", "P", "cAlpha", "varT", "corGO", "R2",
                                      "miItemsPlot"),
-                     # between = c("MIvio", "P", "cAlpha", "corGO", "R2",
-                     #             "miItemsPlot"),
                          within = "N")
   
   eta2Tmp <- eta_squared(
@@ -189,7 +184,6 @@ diffSubNF <- diffSubNF %>%
 
 
 MIvec <- c("metric", "scalar", "specific")    
-# outVec <- colnames(diffSub2)[grepl("diff", colnames(diffSub2))]
 outVec <- c("diff_LM", "diff_Ridge", "diff_ENET")
 
 for (iMI in MIvec) {
@@ -202,8 +196,6 @@ for (iMI in MIvec) {
                          data = diffSub2[diffSub2$MIvio == iMI,],
                          between = c("P", "cAlpha", "varT", "corGO", "R2",
                                      "miItemsPlot"),
-                         # between = c("P", "cAlpha", "corGO", "R2",
-                         #             "miItemsPlot"),
                          within = "N")
       
     } else {
@@ -212,8 +204,7 @@ for (iMI in MIvec) {
       anovaTmp <- aov_ez(id = "ID",
                          dv = iOut,
                          data = diffSubNF,
-                         # between = c("P", "cAlpha", "varT", "corGO", "R2", "corNF"),
-                         between = c("P", "cAlpha", "corGO", "R2", "corNF"),
+                         between = c("P", "cAlpha", "varT", "corGO", "R2", "corNF"),
                          within = "N")
       
     }

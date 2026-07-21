@@ -122,9 +122,6 @@ performMeasures$diff_group_LM <- performMeasures$items_group_LM - performMeasure
 performMeasures$diff_group_Ridge <- performMeasures$items_group_Ridge - performMeasures$score_group_LM
 performMeasures$diff_group_ENET <- performMeasures$items_group_ENET - performMeasures$score_group_LM
 
-# performMeasures$diff_combGroup_LM <- performMeasures$items_group_LM - performMeasures$comb_group_LM
-# performMeasures$diff_combGroup_Ridge <- performMeasures$items_group_Ridge - performMeasures$comb_group_Ridge
-# performMeasures$diff_combGroup_ENET <- performMeasures$items_group_ENET - performMeasures$comb_group_ENET
 
 performMeasures <- tidyr::pivot_longer(performMeasures, 
                                        cols = !c("MIvio", "miItems", "P", "Q", "cAlpha", "varT",

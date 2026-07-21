@@ -172,22 +172,4 @@ for (iVarT in varTvec) {
   }
 }  
 
-# only look at lambda if there are any specific research questions involved, etc. 
-# ################################################################################
-# # How strong is penalty? lambda values? 
-# ################################################################################
-# hyperSelection$lambda <- factor(hyperSelection$lambda)
-# 
-# countLambda <- hyperSelection %>% 
-#   group_by(MIvio, miItemsPlot, P, Q, cAlpha, varT, corGO, R2, N, model, predSet) %>% 
-#   count(lambda, .drop = FALSE) 
-# 
-# countLambda
-# 
-# ggplot(countLambda[countLambda$model == "ENET" & 
-#                      countLambda$varT == 0.25, ], 
-#        aes(x = factor(lambda), y = n, fill = interaction(miItemsPlot, MIvio))) +
-#   geom_col(position = position_dodge(width = 0.7)) +
-#   scale_y_continuous(limits = c(-10, 100), breaks = seq(0, 100, 50)) +
-#   facet_grid(cAlpha + corGO ~ N + P + R2) +
-#   ylab("Count per level")
+
