@@ -137,12 +137,8 @@ fitRegReg <- function(trainData, testData, foldid, regMode, group = F) {
     
     # standardize and center full training and full test for refitting model on 
     #     full data and test performance!
-    fullTrain <- cbind(trainData[,"Y"], 
-                       apply(trainData[, which(colnames(trainData) %in% iPredSet)], 
-                             2, scale, center = T, scale = T))
-    fullTest <- cbind(testData[,"Y"], 
-                      apply(testData[, which(colnames(testData) %in% iPredSet)], 
-                            2, scale, center = T, scale = T)) 
+    fullTrain <- trainData[,c("Y", iPredSet)]
+    fullTest <- testData[,c("Y", iPredSet)]
     
     # get Root Mean Squared Error (RMSE), explained variance (R2), and Mean Absolute Error (MAE) for model training
     predTrain <- predict(fit, fullTrain)
