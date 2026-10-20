@@ -33,10 +33,9 @@ colsCondVec <- length(parseFilename(fileVec[1]))
 # careful! this might change! (see 02_fitData.R)!
 uniqueModels <- c("items", "score", "comb", "items_group", "score_group", "comb_group", 
   "items", "comb", "items_group", "comb_group", 
-  "items", "comb", "items_group", "comb_group",
-  "comb", "comb_group")
+  "items", "comb", "items_group", "comb_group")
 
-# uniqueModels <- c("items", "score", "comb", "items", "comb", "items", "comb", "comb")
+# uniqueModels <- c("items", "score", "comb", "items", "comb", "items", "comb")
 
 # fitted models x training sample size (N) x number of sample (nTrain) 
 rowsPerFile <- length(uniqueModels) * length(params$dgp$trainN) * params$sim$nTrain
@@ -194,9 +193,8 @@ colsHyperVec <- ncol(testSample[[1]][["hyperParams"]])
 
 # careful! this might change! (see 02_fitData.R)!
 uniqueModels <- c("items", "comb", "items_group", "comb_group", 
-                  "items", "comb", "items_group", "comb_group",
-                  "comb", "comb_group")
-# uniqueModels <- c("items", "comb", "items", "comb", "comb")
+                  "items", "comb", "items_group", "comb_group")
+# uniqueModels <- c("items", "comb", "items", "comb")
 
 # fitted models x training sample size (N) x number of sample (nTrain) 
 rowsPerFileHyper <- length(uniqueModels) * length(params$dgp$trainN) * params$sim$nTrain
