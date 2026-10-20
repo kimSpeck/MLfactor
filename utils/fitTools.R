@@ -25,11 +25,18 @@ evalPerformance <- function(pred, obs) {
                            warning = function(w) 0, silent = TRUE) 
     mse <- mean((pred - obs)^2)
     mae <- mean(abs(pred - obs))
+    # return out-of-sample R² and mean prediction bias
+    sst <- sum((obs - mean(obs))^2)
+    R2pred <- if (sst > 0) 1 - sum((obs - pred)^2) / sst else NA_real_
+    bias <- mean(pred - obs)
   } else {
     resamplCor <- NA
     mse <- NA
     mae <- NA
+    R2pred <- NA
+    bias <- NA
   }
   
-  return(c(RMSE = sqrt(mse), Rsquared = resamplCor^2, MAE = mae))
+  return(c(RMSE = sqrt(mse), Rsquared = resamplCor^2, R2pred = R2pred, 
+           predBias = bias, MAE = mae))
 }

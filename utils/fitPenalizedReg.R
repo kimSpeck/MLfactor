@@ -142,11 +142,11 @@ fitRegReg <- function(trainData, testData, foldid, regMode, group = F) {
     
     # get Root Mean Squared Error (RMSE), explained variance (R2), and Mean Absolute Error (MAE) for model training
     predTrain <- predict(fit, fullTrain)
-    performTrain <- matrix(evalPerformance(predTrain, fullTrain$Y), ncol = 3, nrow = 1)
+    performTrain <- matrix(evalPerformance(predTrain, fullTrain$Y), ncol = 5, nrow = 1)
     
     # get Root Mean Squared Error (RMSE), explained variance (R2), and Mean Absolute Error (MAE) for model testing
     predTest <- predict(fit, fullTest)  
-    performTest <- matrix(evalPerformance(predTest, fullTest$Y), ncol = 3, nrow = 1)
+    performTest <- matrix(evalPerformance(predTest, fullTest$Y), ncol = 5, nrow = 1)
     
     # here: calculate prediction bias and prediction variance
     predBias <- NA_real_
@@ -204,9 +204,10 @@ fitRegReg <- function(trainData, testData, foldid, regMode, group = F) {
   # object with results to return to fitData Script 
   resPenReg[["performVec"]] <- do.call(rbind, lapply(predSetRes, `[[`, "performVec"))
   # name columns of performance Matrix
-  colnames(resPenReg[["performVec"]]) <- c(unite(expand.grid(c("RMSE", "Rsquared", "MAE"), 
-                                                          c("CVtest", "train", "HOtest")), 
-                                              "names"))[["names"]]
+  colnames(resPenReg[["performVec"]]) <- c(paste0(c("RMSE", "Rsquared", "MAE"), "_CVtest"), 
+                                           c(unite(expand.grid(c("RMSE", "Rsquared", "MAE", "R2pred", "predBias"), 
+                                                          c("train", "HOtest")), 
+                                              "names"))[["names"]])
   
   # resPenReg[["predError"]] <- do.call(rbind, lapply(predSetRes, `[[`, "predError"))
   resPenReg[["regCoef"]] <- do.call(rbind, lapply(predSetRes, `[[`, "regCoef"))

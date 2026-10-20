@@ -77,10 +77,13 @@ performMeasures <- data.frame(performMeasures)
 names(performMeasures) <- c("MIvio","miItems","P","Q","cAlpha","varT","corGO","R2", 
                             "sample", "N", "model", "predSet", 
                             "RMSE_CVtest", "Rsquared_CVtest", "MAE_CVtest", 
-                            "RMSE_train", "Rsquared_train", "MAE_train",
-                            "RMSE_HOtest", "Rsquared_HOtest", "MAE_HOtest")
-col2num <- c("R2", "RMSE_CVtest", "Rsquared_CVtest", "MAE_CVtest", "RMSE_train", "Rsquared_train", 
-             "MAE_train", "RMSE_HOtest", "Rsquared_HOtest", "MAE_HOtest")
+                            "RMSE_train", "Rsquared_train", "R2pred_train", 
+                            "predBias_train", "MAE_train",
+                            "RMSE_HOtest", "Rsquared_HOtest", "R2pred_HOtest", 
+                            "predBias_HOtest""MAE_HOtest")
+col2num <- c("R2", "RMSE_CVtest", "Rsquared_CVtest", "MAE_CVtest", "RMSE_train", 
+             "Rsquared_train", "R2pred_train", "predBias_train", "MAE_train", 
+             "RMSE_HOtest", "Rsquared_HOtest", "R2pred_HOtest", "predBias_HOtest", "MAE_HOtest")
 performMeasures[col2num] <- sapply(performMeasures[col2num], as.numeric)
 
 col2fac <- c("MIvio","miItems","P","Q","cAlpha","varT","corGO", "sample", "N", "model", "predSet")
@@ -95,8 +98,8 @@ save(performMeasures, file = paste0(resFolder, "/", depFolder, "/performPerSampl
 # load(paste0(resFolder, "/", depFolder, "/performPerSample.rds"))
 performMeasures <- tidyr::pivot_longer(performMeasures,
                                        cols = c("RMSE_CVtest", "Rsquared_CVtest", "MAE_CVtest", 
-                                                "RMSE_train", "Rsquared_train", "MAE_train", 
-                                                "RMSE_HOtest", "Rsquared_HOtest", "MAE_HOtest"),
+                                                "RMSE_train", "Rsquared_train", "R2pred_train", "predBias_train", "MAE_train", 
+                                                "RMSE_HOtest", "Rsquared_HOtest", "R2pred_HOtest", "predBias_HOtest", "MAE_HOtest"),
                                        names_to = "measure_type",
                                        values_to = "values")
 
