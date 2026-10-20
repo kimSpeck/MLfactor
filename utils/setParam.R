@@ -107,7 +107,7 @@ params$sim$nSamples <- params$sim$nTrain + params$sim$nTest
 # !if 50% of training sample size is used as test sample, test sample sizes vary across N observation conditions
 #   as a result, the empirical SE of Rsquared changes according to N 
 #   -> fix test sample size 
-params$sim$testN <- 1000            # fixed test sample size across all N conditions 
+params$sim$testN <- 100000            # fixed test sample size across all N conditions 
 
 ################################################################################
 # data generating process
@@ -298,45 +298,7 @@ params$dgp$grid$betaS <- ifelse(params$dgp$grid$MIvio != "specific", 0, params$d
 #   if the true DGP has only one group
 # params$dgp$varFLgrid$nGroups <- ifelse(params$dgp$varFLgrid$MIvio == "specific", 1, params$dgp$nGroups)
 
-# # add condition with correlations between item-specific variance (only for nuance condition "specific")
-# # this manipulation is only meaningful if miItems > 1
-# # unique(params$dgp$grid$miItems)
-# 
-# params$dgp$grid$covNuanceFactor <- 0
-# 
-# params$dgp$corNuanceFactor <- c(.5, .7, .9)
-# 
-# for (iCorNF in params$dgp$corNuanceFactor){
-#   duplicate <- params$dgp$grid[params$dgp$grid$MIvio == "specific" &
-#                                  params$dgp$grid$miItems > 1, ]
-#   duplicate$MIvio <- paste0("NF_", iCorNF)
-#   duplicate$covNuanceFactor <- sapply(seq_len(dim(duplicate)[1]), function(iRow) {
-#     return(getCovNuance(targetR = iCorNF,
-#                         varS = params$dgp$grid$varS[iRow]))
-#   })
-#   params$dgp$grid <- rbind(params$dgp$grid, duplicate)
-# }
-
 params$dgp$grid$varEreal <- params$dgp$grid$varE
-
-b0real <- c(.4, .6)
-
-for (ib0real in b0real){
-  duplicate <- params$dgp$grid[params$dgp$grid$MIvio == "scalar" &
-                                 params$dgp$grid$miItems >= 1, ]
-  duplicate$MIvio <- paste0("scalarReal", ib0real)
-  duplicate$b0 <- ib0real
-  duplicate$varEreal <- sapply(seq_len(dim(duplicate)[1]), function(iRow) {
-    return(getVarE(flT = duplicate$flT[iRow],
-                   varT = duplicate$varT[iRow],
-                   varItems = params$dgp$varItems, 
-                   b0 = ib0real,
-                   varG = params$dgp$varG))
-  })
-  params$dgp$grid <- rbind(params$dgp$grid, duplicate)
-}
-
-rm(duplicate, b0real)
 
 # create seed number for parallel cluster (reproducibility of generated data)
 #   keep seeds from simulating only linear effects and only add nonlinear conditions with seed
@@ -356,7 +318,7 @@ params$fit$nfolds <- 10
 
 ##### ENET #####
 # fixed set of lambda parameters (only used if warmStart = FALSE)
-params$fit$lambda <- 10^seq(-1, 1, length = 100) 
+params$fit$lambda <- 10^seq(-3, 1, length = 100) 
 # use warmStart?
 #  pro: this is how caret operates (i.e., get lambda values for alpha = 0.5)
 #         -> thus, lots of users use warm start for lambda tuning
