@@ -50,15 +50,8 @@ subGrid$varScoreHetero <- (subGrid$flT**2 * subGrid$varT) +
   ((subGrid$b0**2 / subGrid$P**2) * params$dgp$varG) + 
   ((1/subGrid$P**2) * (((subGrid$P-1) * (subGrid$varE + subGrid$varStable)) + subGrid$varE))
 
-# # assuming homoscedastic error; this is wrong!
-# subGrid$varScoreHomo <- (subGrid$flT**2 * subGrid$varT) + 
-#   ((subGrid$b0**2 / subGrid$P**2) * params$dgp$varG) + 
-#   (subGrid$varE/subGrid$P)
-
 # calculate cov(Ip, Y|S) - partial covariance
 subGrid$covIY_S_Hetero <- subGrid$covIY - ((subGrid$covIS * subGrid$covYS) / subGrid$varScoreHetero)
-# # assuming homoscedastic error; this is wrong!
-# subGrid$covIY_S_Homo <- subGrid$covIY - ((subGrid$covIS * subGrid$covYS) / subGrid$varScoreHomo)
 
 # calculate the covariance of Y with the non-invariant item residualized by 
 #   what the Score already explains in the item 
@@ -73,6 +66,15 @@ subGrid$gamma <- subGrid$covIS / subGrid$varScoreHetero
 #      (1/subGrid$P**2) * (((subGrid$P-1) * (subGrid$varE + subGrid$varStable)) + subGrid$varE))
   
 subGrid$covYresI <- subGrid$covIY - subGrid$gamma * subGrid$covYS
+
+# calculate var(Ip - beta_Score * Score): variance of the residualized non-invariant item
+#   var(Ip) = 1 by design (params$dgp$varItems)
+subGrid$varResI <- params$dgp$varItems - subGrid$gamma * subGrid$covIS
+
+# population Delta R² (items - score): squared semi-partial correlation between Y and 
+#   the residualized non-invariant item (OLS with N -> infinity)
+#   exact for one non-invariant item because the invariant items are exchangeable 
+subGrid$deltaR2 <- subGrid$covYresI**2 / (subGrid$varResI * subGrid$varY)
 
 # plot results
 shapeVec <- c(3, 4)
@@ -121,6 +123,25 @@ covPlotScalar <- ggplot(subGrid,
 #                 height = 9.60,
 #                 units = "in")
 
+(deltaR2PlotScalar <- ggplot(subGrid, 
+                             aes(x = factor(R2), y = deltaR2,
+                                 group = interaction(factor(varStable), factor(P)), shape = factor(P), 
+                                 color = factor(varStable))) +
+    geom_hline(yintercept = 0, colour = "black", linewidth = 0.4, alpha = 0.4) +
+    geom_point(position = position_dodge(width = dodge_w), size = 3, alpha = 0.7) +
+    scale_colour_grey(start = 0.5, end = 0.25, name = expression(sigma[specific]^2)) +
+    scale_shape_discrete(name = "P") +
+    labs(y = expression(Delta*R^2~"(items - score)"), x = expression(R[F]^2)) +
+    facet_grid(cAlpha_lab ~ corGO_lab, labeller = label_parsed))
+
+(deltaR2PlotScalar <- themeFunctionPaper(deltaR2PlotScalar))
+
+# ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/deltaR2_scalar.png"),
+#                 plot = deltaR2PlotScalar,
+#                 width = 13.63,
+#                 height = 9.60,
+#                 units = "in")
+
 ################################################################################
 # covariance outcome -- residualized metric non-invariant item
 ################################################################################
@@ -153,6 +174,7 @@ subGrid_M$covYS <- (subGrid_M$betaT * subGrid_M$varT) *
 subGrid_M$varScoreHetero <- (subGrid_M$flT**2 * subGrid_M$varT) +
   ((subGrid_M$b1**2 / subGrid_M$P**2) * (params$dgp$meanG**2 * subGrid_M$varT + 
                                           params$dgp$varG * subGrid_M$varT)) +
+  (2 * (subGrid_M$flT * subGrid_M$b1 / subGrid_M$P) * (params$dgp$meanG * subGrid_M$varT)) +
   ((1/subGrid_M$P**2) * (((subGrid_M$P-1) * (subGrid_M$varE + subGrid_M$varStable)) + subGrid_M$varE))
   
 
@@ -166,6 +188,15 @@ subGrid_M$gamma <- subGrid_M$covIS / subGrid_M$varScoreHetero
 range(subGrid_M$gamma)
 
 subGrid_M$covYresI <- subGrid_M$covIY - subGrid_M$gamma * subGrid_M$covYS
+
+# calculate var(Ip - beta_Score * Score): variance of the residualized non-invariant item
+#   var(Ip) = 1 by design (params$dgp$varItems)
+subGrid_M$varResI <- params$dgp$varItems - subGrid_M$gamma * subGrid_M$covIS
+
+# population Delta R² (items - score): squared semi-partial correlation between Y and 
+#   the residualized non-invariant item (OLS with N -> infinity)
+subGrid_M$deltaR2 <- subGrid_M$covYresI**2 / (subGrid_M$varResI * subGrid_M$varY)
+
 
 # plot results
 shapeVec <- c(3, 4)
@@ -244,3 +275,21 @@ which(subGrid_M$covYresI < 0) %in% idxVarE0
 #                 height = 9.60,
 #                 units = "in")
 
+(deltaR2PlotMetric <- ggplot(subGrid_M, 
+                             aes(x = factor(R2), y = deltaR2,
+                                 group = interaction(factor(varStable), factor(P)), shape = factor(P), 
+                                 color = factor(varStable))) +
+    geom_hline(yintercept = 0, colour = "black", linewidth = 0.4, alpha = 0.4) +
+    geom_point(position = position_dodge(width = dodge_w), size = 3, alpha = 0.7) +
+    scale_colour_grey(start = 0.5, end = 0.25, name = expression(sigma[specific]^2)) +
+    scale_shape_discrete(name = "P") +
+    labs(y = expression(Delta*R^2~"(items - score)"), x = expression(R[F]^2)) +
+    facet_grid(cAlpha_lab ~ corGO_lab, labeller = label_parsed))
+
+(deltaR2PlotMetric <- themeFunctionPaper(deltaR2PlotMetric))
+
+# ggplot2::ggsave(filename = paste0(plotFolder, "/", plotCheckFolder, "/deltaR2_metric.png"),
+#                 plot = deltaR2PlotMetric,
+#                 width = 13.63,
+#                 height = 9.60,
+#                 units = "in")
