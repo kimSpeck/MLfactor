@@ -293,3 +293,9 @@ which(subGrid_M$covYresI < 0) %in% idxVarE0
 #                 width = 13.63,
 #                 height = 9.60,
 #                 units = "in")
+
+################################################################################
+saveCols <- c("MIvio", "miItems", "P", "cAlpha", "varT", "corGO", "R2", "deltaR2")
+deltaR2Analytic <- rbind(subGrid[, saveCols], subGrid_M[, saveCols])
+deltaR2Analytic$miItemsPlot <- as.character(deltaR2Analytic$miItems)
+save(deltaR2Analytic, file = "results/dependentMeasures/deltaR2_analytic.rda")
