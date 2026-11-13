@@ -9,6 +9,8 @@ library(emmeans)
 library(tidyverse)
 library(reshape2)
 library(ggplot2)
+library(wdm)
+library(xtable)
 
 resFolder <- "results"
 depFolder <- "dependentMeasures"
@@ -39,9 +41,6 @@ gc()
 col2fac <- c("MIvio", "P", "Q", "cAlpha", "varT", "corGO", "R2", "sample", "N", 
              "measure_type", "miItemsPlot", "model")
 diffSub[col2fac] <- lapply(diffSub[col2fac], factor)
-
-# remove small non-invariance effect sizes (not full factorial)
-diffSub <- diffSub[!(diffSub$MIvio %in% c("scalarReal0.4", "scalarReal0.6")), ]
 
 # # get ANOVA result without the large effect size condition varT = 0.25
 # unique(diffSub$varT)
@@ -76,8 +75,6 @@ diffSub <- diffSub %>%
   group_by(N) %>%
   mutate(ID = seq_len(n())) %>%
   ungroup()
-
-subNoNF <- diffSub[!grepl("^NF0\\.", diffSub$MIvio), ]
 
 outVec <- c("diff_LM", "diff_Ridge", "diff_ENET")
 for (iOut in outVec) {
@@ -173,41 +170,19 @@ diffSub2 <- diffSub %>%
   mutate(ID = seq_len(n())) %>%
   ungroup()
 
-idxNF <- which(grepl("^NF", diffSub2$MIvio))
-diffSubNF <- diffSub2[idxNF,]
-diffSubNF$corNF <- as.factor(substr(diffSubNF$MIvio, 3, nchar(as.character(diffSubNF$MIvio[1]))))
-
-diffSubNF <- diffSubNF %>%
-  group_by(N) %>%
-  mutate(ID = seq_len(n())) %>%
-  ungroup()
-
-
 MIvec <- c("metric", "scalar", "specific")    
 outVec <- c("diff_LM", "diff_Ridge", "diff_ENET")
 
 for (iMI in MIvec) {
   for (iOut in outVec) {
     
-    if (iMI != "NF") {
-      # ANOVA with miItemsPlot because multiple levels in factor
-      anovaTmp <- aov_ez(id = "ID",
-                         dv = iOut,
-                         data = diffSub2[diffSub2$MIvio == iMI,],
-                         between = c("P", "cAlpha", "varT", "corGO", "R2",
-                                     "miItemsPlot"),
-                         within = "N")
-      
-    } else {
-      
-      # ANOVA without miItemsPlot because only one level in factor
-      anovaTmp <- aov_ez(id = "ID",
-                         dv = iOut,
-                         data = diffSubNF,
-                         between = c("P", "cAlpha", "varT", "corGO", "R2", "corNF"),
-                         within = "N")
-      
-    }
+    # ANOVA with miItemsPlot because multiple levels in factor
+    anovaTmp <- aov_ez(id = "ID",
+                       dv = iOut,
+                       data = diffSub2[diffSub2$MIvio == iMI,],
+                       between = c("P", "cAlpha", "varT", "corGO", "R2",
+                                   "miItemsPlot"),
+                       within = "N")
     
     # investigate marginal means later
     anovaObjectName <- paste0("anova_", iMI, "_", iOut)
