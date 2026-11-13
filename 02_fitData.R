@@ -27,11 +27,19 @@ createFolder(logFolder)
 
 timeStamp <- format(Sys.time(), "%d%m%y_%H%M%S")
 # nCoresSampling <- detectCores() - 1 
-nCoresSampling <- 20
+nCoresSampling <- 30
 
-# grid <- params$dgp$grid
-# grid <- params$dgp$grid[which(params$dgp$grid$MIvio %in% paste0("NF_", params$dgp$corNuanceFactor)), ]
-grid <- params$dgp$grid[which(params$dgp$grid$MIvio %in% paste0("scalarReal", c(0.4, 0.6))), ]
+grid <- params$dgp$grid
+
+# existing result files
+fileVec <- list.files(resFolder, pattern = "^resFile_", 
+                      include.dirs = FALSE, recursive = FALSE)
+# expected file names; identical to resFileName in 02_fitData.R
+E_fileNames <- paste0("resFile_MIvio", grid$MIvio, "_miItems", grid$miItems,
+                       "_P", grid$P, "_Q", grid$Q, "_cAlpha", grid$cAlpha,
+                       "_varT", grid$varT, "_corGO", grid$corGO, "_R2", grid$R2, ".rds")
+# remove conditions with existing result file from the grid
+grid <- grid[!E_fileNames %in% fileVec, ]
 
 # only load biggest dataset! draw random subsamples and fit smaller subsets
 # this is done to avoid excessive memory requirements to save the data!
