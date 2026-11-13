@@ -39,7 +39,7 @@ nCoresSampling <- 30 # simulate data
 grid <- params$dgp$grid
 # ! factors are interpreted as level numbers!; only character variables are interpreted by their name!
 str(grid) 
-# grid <- params$dgp$grid[which(params$dgp$grid$MIvio %in% paste0("NF_", params$dgp$corNuanceFactor)), ]
+unique(grid$MIvio)
 
 # # sanity checks for data
 # params$sim$nSamples <- 1
@@ -205,6 +205,6 @@ createData <- function(P, Q, cAlpha, varT, miItems, corGO, R2, varStable, flT, f
 }
 
 # actually sample data (or save checks - checkFlag = T)
-out <- do.call(mapply, c(FUN = createData, grid[!grepl("^NF_", grid$MIvio),]))
+out <- do.call(mapply, c(FUN = createData, grid))
 
 options(warn = 0)
