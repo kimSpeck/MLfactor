@@ -22,8 +22,8 @@ fileVec <- list.files(resFolder, pattern = "^resFile_",
 # fileVec <- list.files(resFolder, pattern = "^resFile_", 
 #                       include.dirs = FALSE, recursive = FALSE)
 
-# remove NF results
-fileVec <- fileVec[!grepl("MIvioNF", fileVec)]
+# # remove NF results
+# fileVec <- fileVec[!grepl("MIvioNF", fileVec)]
 
 # get result object dimensions
 testSample <- readRDS(paste0(resFolder, "/", fileVec[1]))
@@ -80,7 +80,7 @@ names(performMeasures) <- c("MIvio","miItems","P","Q","cAlpha","varT","corGO","R
                             "RMSE_train", "Rsquared_train", "R2pred_train", 
                             "predBias_train", "MAE_train",
                             "RMSE_HOtest", "Rsquared_HOtest", "R2pred_HOtest", 
-                            "predBias_HOtest""MAE_HOtest")
+                            "predBias_HOtest", "MAE_HOtest")
 col2num <- c("R2", "RMSE_CVtest", "Rsquared_CVtest", "MAE_CVtest", "RMSE_train", 
              "Rsquared_train", "R2pred_train", "predBias_train", "MAE_train", 
              "RMSE_HOtest", "Rsquared_HOtest", "R2pred_HOtest", "predBias_HOtest", "MAE_HOtest")
